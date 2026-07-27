@@ -1,0 +1,62 @@
+# Caddy load balancer for the ragembedingv1 gateway.
+#
+# The gateway forwards every accepted /v1/embeddings request to this one address
+# (CADDY_UPSTREAM_URL, default http://localhost:11435). Caddy fans it out across
+# the 10 Ollama backends below, so the gateway stays stateless about which node
+# serves a request.
+#
+# Replace the ollama-1..ollama-10 hostnames with your real backends. Two common
+# shapes:
+#   - 10 hosts/containers, each running Ollama on :11434  (as written below)
+#   - 10 Ollama processes on one host, on ports 11434..11443
+# Validate after editing:  caddy validate --config caddy/Caddyfile
+{
+	# This is an internal, trusted-network balancer: no admin API, plain HTTP.
+	admin off
+	auto_https off
+}
+
+# Plain HTTP on the port the gateway targets. A bare :port site is HTTP only,
+# which is what we want on a trusted network behind the gateway.
+:11435 {
+	# A lightweight, unauthenticated liveness endpoint for the balancer itself.
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	# Everything else (the OpenAI-compatible /v1/* and native /api/* routes) is
+	# load-balanced across the Ollama pool.
+	handle {
+		reverse_proxy ollama-1:11434 ollama-2:11434 ollama-3:11434 ollama-4:11434 ollama-5:11434 ollama-6:11434 ollama-7:11434 ollama-8:11434 ollama-9:11434 ollama-10:11434 {
+			# least_conn sends each request to the backend with the fewest active
+			# requests — the right policy for uneven, sometimes-slow embedding calls.
+			lb_policy least_conn
+
+			# Active health checks: poll Ollama's version endpoint and only route to
+			# backends that answer 200, so a restarting node is skipped automatically.
+			health_uri /api/version
+			health_interval 10s
+			health_timeout 5s
+			health_status 200
+
+			# Passive health: pull a backend out for a while after repeated failures
+			# even between active checks.
+			fail_duration 30s
+			max_fails 3
+
+			# Embedding calls can be slow under load; give the response generous room
+			# while still bounding a dead connection at dial time.
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 120s
+				read_timeout 300s
+			}
+		}
+	}
+
+	# Structured access logs help correlate gateway 502s with backend trouble.
+	log {
+		output stderr
+		format console
+	}
+}
