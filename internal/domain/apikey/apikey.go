@@ -6,8 +6,14 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"encoding/hex"
+	"errors"
 	"time"
 )
+
+// ErrNotFound is returned by Repository.ByHash when no key matches. It is a
+// domain sentinel so consumers (e.g. the auth middleware) test for it with
+// errors.Is without importing the persistence layer's own error types.
+var ErrNotFound = errors.New("apikey: not found")
 
 // keyPrefix marks a plaintext key as belonging to this gateway. It is purely
 // cosmetic (helps operators recognise the token) and is part of the hashed
