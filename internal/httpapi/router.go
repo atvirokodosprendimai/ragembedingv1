@@ -31,10 +31,10 @@ type Router struct {
 func (rt Router) Handler() http.Handler {
 	r := chi.NewRouter()
 
-	// Baseline middleware: a request id for correlation, panic recovery so one
-	// bad request can't take the process down, and real client IP resolution.
+	// Baseline middleware: a request id for correlation and panic recovery so one
+	// bad request can't take the process down. Client IP is deliberately not
+	// derived from forwarded headers (spoofable) — enforcement is per API key.
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 
 	// Public liveness probe.

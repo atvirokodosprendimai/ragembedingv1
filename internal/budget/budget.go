@@ -3,9 +3,9 @@
 // a request is forwarded — whether the key still has tokens to spend.
 //
 // The check is pre-flight and the authoritative bge-m3 count only arrives with
-// the upstream response, so a key can exceed its allowance by at most one
-// in-flight request. That bounded overshoot is an accepted tradeoff for a soft
-// prepaid budget (documented on apikey.BudgetExhausted).
+// the upstream response, so a key can exceed its allowance by the tokens of the
+// requests already in flight when the budget is crossed. That bounded overshoot
+// is an accepted tradeoff for a soft prepaid budget (see apikey.BudgetExhausted).
 package budget
 
 import (

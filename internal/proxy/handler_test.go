@@ -173,6 +173,18 @@ func TestBatchTooLargeIsRejectedBeforeForward(t *testing.T) {
 	require.False(t, d.fw.called, "an over-limit batch must not reach the upstream")
 }
 
+// TestMixedArrayCannotBypassBatchLimit is the regression test for the Codex
+// finding: a leading number must not make an oversized mixed array count as one.
+func TestMixedArrayCannotBypassBatchLimit(t *testing.T) {
+	d := defaultDeps()
+	key := testKey()
+	key.BatchMax = 2
+	w := serve(t, d.handler(), `{"input":[0,"a","b","c"]}`, key)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.False(t, d.fw.called, "the oversized mixed batch must not reach the upstream")
+}
+
 func TestEmptyInputArrayIsRejected(t *testing.T) {
 	d := defaultDeps()
 	w := serve(t, d.handler(), `{"input":[]}`, testKey())

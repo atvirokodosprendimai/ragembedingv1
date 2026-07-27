@@ -113,7 +113,8 @@ func (h *Handler) Embeddings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	n, err := countInputs(req.Input)
+	// Pass the key's batch limit so counting can stop early on an oversized batch.
+	n, err := countInputs(req.Input, key.BatchMax)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return

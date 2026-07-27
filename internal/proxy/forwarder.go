@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+// maxUpstreamBytes caps how much of an upstream response the gateway buffers. A
+// full batch of bge-m3 embeddings is well under this; the cap stops a
+// misbehaving or compromised backend from driving the gateway out of memory.
+const maxUpstreamBytes int64 = 64 << 20 // 64 MiB
+
 // UpstreamResponse is the buffered result of a forwarded call. The body is fully
 // read so the gateway can both parse usage.prompt_tokens from it and relay it to
 // the client; embedding responses are small enough (no streaming) that buffering
@@ -59,9 +64,14 @@ func (f *HTTPForwarder) Forward(ctx context.Context, path string, body []byte) (
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	// Read at most maxUpstreamBytes+1 so an over-cap body is detectable rather
+	// than silently truncated.
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("proxy: read upstream body: %w", err)
+	}
+	if int64(len(respBody)) > maxUpstreamBytes {
+		return nil, fmt.Errorf("proxy: upstream response exceeded %d bytes", maxUpstreamBytes)
 	}
 	return &UpstreamResponse{
 		StatusCode: resp.StatusCode,

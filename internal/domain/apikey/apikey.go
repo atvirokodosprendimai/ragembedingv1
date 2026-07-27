@@ -85,9 +85,11 @@ func (k APIKey) AllowsBatch(n int) bool {
 // exhausted.
 //
 // Enforcement is pre-flight and the authoritative bge-m3 count is only known
-// after the upstream call, so a key can overshoot its budget by at most one
-// in-flight request. That bound is acceptable for a soft prepaid allowance and
-// is documented rather than engineered away.
+// after the upstream call (usage is recorded once the response returns), so a
+// key can overshoot its budget by the tokens of whatever requests are already
+// in flight when the allowance is crossed. For a soft prepaid allowance that
+// bounded overshoot is accepted rather than engineered away with a distributed
+// token reservation.
 func (k APIKey) BudgetExhausted(usedThisMonth, usedLifetime int64) bool {
 	if k.IsUnlimited() {
 		return false
