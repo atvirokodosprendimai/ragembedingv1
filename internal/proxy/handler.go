@@ -94,7 +94,7 @@ func (h *Handler) Embeddings(w http.ResponseWriter, r *http.Request) {
 	// unauthenticated rather than trusted.
 	key, ok := APIKeyFrom(r.Context())
 	if !ok {
-		writeAPIError(w, http.StatusUnauthorized, "invalid_request_error", "missing API key")
+		WriteError(w, http.StatusUnauthorized, "invalid_request_error", "missing API key")
 		return
 	}
 
@@ -103,23 +103,23 @@ func (h *Handler) Embeddings(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		// MaxBytesReader signals an over-limit body via its error on read.
-		writeAPIError(w, http.StatusRequestEntityTooLarge, "invalid_request_error", "request body too large")
+		WriteError(w, http.StatusRequestEntityTooLarge, "invalid_request_error", "request body too large")
 		return
 	}
 
 	var req embeddingsRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_request_error", "request body is not valid JSON")
+		WriteError(w, http.StatusBadRequest, "invalid_request_error", "request body is not valid JSON")
 		return
 	}
 
 	n, err := countInputs(req.Input)
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_request_error", err.Error())
+		WriteError(w, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return
 	}
 	if !key.AllowsBatch(n) {
-		writeAPIError(w, http.StatusBadRequest, "invalid_request_error",
+		WriteError(w, http.StatusBadRequest, "invalid_request_error",
 			fmt.Sprintf("batch size %d exceeds the limit of %d inputs per request", n, key.BatchMax))
 		return
 	}
@@ -127,7 +127,7 @@ func (h *Handler) Embeddings(w http.ResponseWriter, r *http.Request) {
 	// Rate limit before the budget query so a flood is shed without hitting the DB.
 	if d := h.limiter.Allow(key.ID, key.RatePerMin); !d.Allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(d.RetryAfterSeconds()))
-		writeAPIError(w, http.StatusTooManyRequests, "rate_limit_exceeded",
+		WriteError(w, http.StatusTooManyRequests, "rate_limit_exceeded",
 			fmt.Sprintf("rate limit of %d requests/min exceeded; retry in %d seconds", key.RatePerMin, d.RetryAfterSeconds()))
 		return
 	}
@@ -135,13 +135,13 @@ func (h *Handler) Embeddings(w http.ResponseWriter, r *http.Request) {
 	st, err := h.budget.Status(r.Context(), *key)
 	if err != nil {
 		h.logger.Error("budget check failed", "key_id", key.ID, "err", err)
-		writeAPIError(w, http.StatusInternalServerError, "internal_error", "could not evaluate token budget")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "could not evaluate token budget")
 		return
 	}
 	if st.Exhausted {
 		// 402 (not 429): the client cannot wait out a prepaid-quota exhaustion the
 		// way it can wait out a per-minute rate limit.
-		writeAPIError(w, http.StatusPaymentRequired, "insufficient_quota",
+		WriteError(w, http.StatusPaymentRequired, "insufficient_quota",
 			"token budget exhausted for this key")
 		return
 	}
@@ -150,7 +150,7 @@ func (h *Handler) Embeddings(w http.ResponseWriter, r *http.Request) {
 	up, err := h.forwarder.Forward(r.Context(), r.URL.Path, body)
 	if err != nil {
 		h.logger.Error("upstream forward failed", "key_id", key.ID, "err", err)
-		writeAPIError(w, http.StatusBadGateway, "upstream_error", "embedding backend unavailable")
+		WriteError(w, http.StatusBadGateway, "upstream_error", "embedding backend unavailable")
 		return
 	}
 

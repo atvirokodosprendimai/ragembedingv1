@@ -4,6 +4,7 @@ go 1.25.7
 
 require (
 	github.com/glebarez/sqlite v1.11.0
+	github.com/go-chi/chi/v5 v5.3.1
 	github.com/joho/godotenv v1.5.1
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/stretchr/testify v1.11.1

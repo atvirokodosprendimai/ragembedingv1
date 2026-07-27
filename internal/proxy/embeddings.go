@@ -96,8 +96,10 @@ type apiErrorBody struct {
 	Type    string `json:"type"`
 }
 
-// writeAPIError writes an OpenAI-style JSON error with the given status.
-func writeAPIError(w http.ResponseWriter, status int, errType, message string) {
+// WriteError writes an OpenAI-style JSON error with the given status. It is
+// exported so the auth middleware emits the exact same error envelope as the
+// handler, keeping the gateway's error surface consistent for SDK clients.
+func WriteError(w http.ResponseWriter, status int, errType, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	// Encoding a fixed, small struct cannot fail in a way we can act on here; the
