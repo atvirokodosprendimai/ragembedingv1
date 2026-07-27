@@ -148,6 +148,8 @@ type Repository interface {
 	Create(ctx context.Context, k *APIKey) error
 	// ByHash returns the key with the given hash, or an error if none exists.
 	ByHash(ctx context.Context, hash string) (*APIKey, error)
+	// ByID returns the key with the given id, or ErrNotFound if none exists.
+	ByID(ctx context.Context, id uint) (*APIKey, error)
 	// List returns all keys, newest first, for the operator CLI and dashboard.
 	List(ctx context.Context) ([]APIKey, error)
 	// Revoke marks the key revoked; subsequent auth attempts fail.

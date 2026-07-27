@@ -45,6 +45,20 @@ func (r *APIKeyRepo) ByHash(ctx context.Context, hash string) (*apikey.APIKey, e
 	return &k, nil
 }
 
+// ByID returns the key with the given id, translating a missing row to the
+// domain's apikey.ErrNotFound.
+func (r *APIKeyRepo) ByID(ctx context.Context, id uint) (*apikey.APIKey, error) {
+	var k apikey.APIKey
+	err := r.db.WithContext(ctx).First(&k, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, apikey.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("apikey repo: by id: %w", err)
+	}
+	return &k, nil
+}
+
 // List returns all keys, newest first, for the CLI and dashboard.
 func (r *APIKeyRepo) List(ctx context.Context) ([]apikey.APIKey, error) {
 	var keys []apikey.APIKey
