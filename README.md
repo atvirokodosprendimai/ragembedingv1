@@ -66,6 +66,27 @@ ragctl create --name nightly-batch            # priority 0, the default
 ragctl priority --id 3 --priority 9           # promote a key already deployed
 ```
 
+## Dashboard access
+
+The dashboard is operator-only — it lists every key, its limits and its spend —
+so it sits behind HTTP Basic auth and **fails closed**: with no
+`DASHBOARD_PASSWORD` set it is not served at all (`404`), and the embeddings API
+carries on regardless. The whole surface is guarded (`/`, `/keys/{id}`, `/queue`
+and the assets); only `/healthz` stays public, so load balancers still work.
+
+```bash
+DASHBOARD_USER=admin DASHBOARD_PASSWORD='…' go run ./cmd/gateway
+```
+
+Two caveats worth knowing:
+
+- **Basic auth needs TLS.** The credential is base64-encoded on every request,
+  not encrypted. If the gateway is reachable from anywhere but localhost, put a
+  TLS terminator in front of it.
+- **It is one shared credential**, not user accounts — rotate it by changing the
+  env var and restarting. Client authentication is separate and unchanged: API
+  keys, `Authorization: Bearer sk-rag-…`.
+
 ## Status-code contract
 
 | Status | Meaning | Client action |
@@ -114,6 +135,8 @@ Copy `.env.example` to `.env`. Real environment variables override `.env`.
 | `DEFAULT_TOKEN_BUDGET` | `-1` | Default token budget (`-1` = unlimited) |
 | `DEFAULT_BUDGET_PERIOD` | `lifetime` | Default period (`monthly`/`lifetime`) |
 | `DEFAULT_PRIORITY` | `0` | Default queue rank for a new key (`0`–`9`) |
+| `DASHBOARD_USER` | `admin` | Dashboard Basic-auth username |
+| `DASHBOARD_PASSWORD` | *(empty)* | Dashboard Basic-auth password; **empty disables the dashboard** |
 | `UPSTREAM_MAX_CONCURRENT` | `10` | Concurrent upstream slots (one per Ollama backend) |
 | `QUEUE_PROMOTE_AFTER` | `5s` | Wait after which a queued request is promoted |
 

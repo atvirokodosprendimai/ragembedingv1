@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -53,6 +55,64 @@ func BearerAuth(keys keyLookup, logger *slog.Logger) func(http.Handler) http.Han
 			next.ServeHTTP(w, r.WithContext(proxy.WithAPIKey(r.Context(), k)))
 		})
 	}
+}
+
+// dashboardRealm names the protection space in the WWW-Authenticate challenge.
+// Browsers show it in the credential prompt and scope the saved password to it.
+const dashboardRealm = "ragembed operator dashboard"
+
+// BasicAuth guards the operator dashboard with a single HTTP Basic credential.
+// The dashboard lists every key, its limits and its spend, so it is operator-only
+// — a different audience from the API's per-client Bearer keys, hence a separate
+// mechanism rather than a reuse of apikey.
+//
+// Security notes:
+//   - Both fields are compared in constant time, over SHA-256 digests so the
+//     comparison is fixed-width: neither the outcome nor its duration leaks how
+//     long the credential is or how much of it was right.
+//   - Username and password are always both compared, so a wrong username costs
+//     the same as a wrong password and cannot be enumerated by timing.
+//   - Basic auth sends the credential on every request, base64-encoded, not
+//     encrypted. It is only private if TLS terminates in front of the gateway.
+func BasicAuth(user, password string, logger *slog.Logger) func(http.Handler) http.Handler {
+	// Digest the expected values once, at wiring time, rather than per request.
+	wantUser := sha256.Sum256([]byte(user))
+	wantPass := sha256.Sum256([]byte(password))
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			gotUser, gotPass, ok := r.BasicAuth()
+			if !ok {
+				// No (or malformed) credentials: challenge rather than accuse, so
+				// a browser shows its login prompt.
+				challenge(w)
+				return
+			}
+
+			gu := sha256.Sum256([]byte(gotUser))
+			gp := sha256.Sum256([]byte(gotPass))
+			userOK := subtle.ConstantTimeCompare(gu[:], wantUser[:]) == 1
+			passOK := subtle.ConstantTimeCompare(gp[:], wantPass[:]) == 1
+			if !userOK || !passOK {
+				// Log the source but never the attempted credential: operators
+				// mistype passwords into the username box, and this log is not
+				// the place to collect them. RemoteAddr is used rather than a
+				// forwarded header, which a client controls.
+				logger.Warn("dashboard auth failed", "remote", r.RemoteAddr, "path", r.URL.Path)
+				challenge(w)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// challenge asks for credentials. The dashboard is HTML, not the JSON API, so it
+// answers in plain text rather than the OpenAI error envelope.
+func challenge(w http.ResponseWriter) {
+	w.Header().Set("WWW-Authenticate", `Basic realm="`+dashboardRealm+`", charset="UTF-8"`)
+	http.Error(w, "authentication required", http.StatusUnauthorized)
 }
 
 // bearerToken extracts the token from an "Authorization: Bearer <token>" header,

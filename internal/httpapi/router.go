@@ -19,8 +19,13 @@ type Router struct {
 	Keys apikey.Repository
 	// Embeddings is the /v1/embeddings enforcement handler.
 	Embeddings *proxy.Handler
-	// Dashboard, if set, is mounted at the site root for the usage UI.
+	// Dashboard, if set, is mounted at the site root for the usage UI. It is
+	// only mounted together with DashboardAuth.
 	Dashboard http.Handler
+	// DashboardAuth guards the dashboard. Without it the dashboard is not served
+	// at all: it lists every key and its spend, so "unprotected" is never a
+	// valid state to serve it in.
+	DashboardAuth func(http.Handler) http.Handler
 	// Logger is used by middleware and handlers.
 	Logger *slog.Logger
 }
@@ -46,10 +51,21 @@ func (rt Router) Handler() http.Handler {
 		r.Post("/v1/embeddings", rt.Embeddings.Embeddings)
 	})
 
-	// Operator dashboard (added in the web task). Mounted at root so it serves
-	// "/", "/keys/{id}", static assets, etc.
-	if rt.Dashboard != nil {
-		r.Mount("/", rt.Dashboard)
+	// Operator dashboard, mounted at root so it serves "/", "/keys/{id}",
+	// "/queue" and the static assets — all of it behind Basic auth. The pairing
+	// is enforced here rather than trusted to the composition root: a wiring
+	// mistake that dropped the middleware would otherwise publish every key's
+	// usage to the internet.
+	switch {
+	case rt.Dashboard == nil:
+		// Nothing to mount; the embeddings API is unaffected.
+	case rt.DashboardAuth == nil:
+		rt.Logger.Error("dashboard NOT served: no authentication configured (set DASHBOARD_PASSWORD)")
+	default:
+		r.Group(func(r chi.Router) {
+			r.Use(rt.DashboardAuth)
+			r.Mount("/", rt.Dashboard)
+		})
 	}
 
 	return r
