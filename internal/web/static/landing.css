@@ -372,3 +372,124 @@ code {
 	border-color: var(--amber-dim);
 	background: rgba(255, 180, 84, 0.1);
 }
+
+/* --- article ------------------------------------------------------------ */
+
+/* The long-form page reuses the landing page's voice, with the few extra parts
+   a real article needs: a way back, a map of itself, and a question list. */
+
+.brand-link {
+	text-decoration: none;
+	color: inherit;
+}
+
+.crumbs {
+	font-size: 11px;
+	color: var(--ink-faint);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	margin: 34px 0 14px;
+}
+.crumbs a {
+	color: var(--ink-dim);
+	text-decoration: none;
+	border-bottom: 1px solid var(--line-2);
+	padding-bottom: 2px;
+}
+.crumbs a:hover {
+	color: var(--amber);
+	border-color: var(--amber-dim);
+}
+
+article h1 {
+	margin-bottom: 18px;
+}
+
+/* A contents list earns its place on a page this long: it is the fastest route
+   to the one section a reader actually came for. */
+.toc {
+	border: 1px solid var(--line);
+	border-left: 3px solid var(--amber-dim);
+	border-radius: 8px;
+	padding: 16px 20px 18px;
+	margin: 0 0 12px;
+	background: rgba(255, 255, 255, 0.014);
+}
+.toc-title {
+	margin: 0 0 10px;
+	font-size: 9px;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: var(--ink-faint);
+	font-weight: 500;
+}
+.toc ol {
+	margin: 0;
+	padding-left: 20px;
+	display: grid;
+	gap: 7px;
+	font-size: 14px;
+}
+.toc a {
+	color: var(--ink-dim);
+	text-decoration: none;
+	border-bottom: 1px solid transparent;
+}
+.toc a:hover {
+	color: var(--amber);
+	border-color: var(--amber-dim);
+}
+
+/* Numbered and bulleted reasons: the lead clause of each is bold, so the list
+   can be skimmed on its own and still make sense. */
+.reasons {
+	margin: 0 0 16px;
+	padding-left: 22px;
+	display: grid;
+	gap: 12px;
+	color: var(--ink-dim);
+	max-width: 62ch;
+}
+.reasons li::marker {
+	color: var(--amber-dim);
+}
+.reasons b {
+	color: var(--ink);
+}
+
+article i {
+	color: var(--ink);
+	font-style: normal;
+	border-bottom: 1px dotted var(--line-2);
+}
+
+article a:not(.mailto):not(.admin-link) {
+	color: var(--amber);
+	text-decoration: none;
+	border-bottom: 1px solid var(--amber-dim);
+}
+
+/* Question list: each question reads as a heading, because that is how it is
+   scanned — and how an assistant quoting the page will lift it. */
+.faq {
+	margin: 0;
+	display: grid;
+	gap: 18px;
+}
+.faq dt {
+	font-weight: 700;
+	color: var(--ink);
+	margin-bottom: 6px;
+}
+.faq dd {
+	margin: 0;
+	color: var(--ink-dim);
+	max-width: 62ch;
+	border-left: 1px solid var(--line-2);
+	padding-left: 14px;
+}
+
+.cta {
+	border-top: 1px solid var(--line);
+	padding-top: 26px;
+}

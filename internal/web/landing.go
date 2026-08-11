@@ -37,10 +37,15 @@ func NewLanding(model string, batchMax, ratePerMin int, contact string, logger *
 	}
 }
 
-// Handler returns the landing page's routes: the page itself and its stylesheet.
+// Handler returns the public routes: the landing page, the article, the files
+// crawlers ask for, and the stylesheet they all share.
 func (s *LandingServer) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", s.handleIndex)
+	r.Get(articlePath, s.handleArticle)
+	r.Get("/robots.txt", s.handleRobots)
+	r.Get("/sitemap.xml", s.handleSitemap)
+	r.Get("/llms.txt", s.handleLLMs)
 
 	sub, _ := fs.Sub(assets, "static")
 	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.FS(sub))))
@@ -86,13 +91,13 @@ func (s *LandingServer) build(r *http.Request) LandingVM {
 		AdminPath:    BasePath,
 		ContactEmail: s.contact,
 		Statuses: []StatusVM{
-			{Code: "200", Meaning: "Embeddings returned", Action: "—", Tone: "ok"},
-			{Code: "400", Meaning: "Bad JSON, or more inputs than your batch limit", Action: "Fix the request", Tone: "bad"},
-			{Code: "401", Meaning: "Missing, invalid or revoked key", Action: "Check your key", Tone: "bad"},
-			{Code: "402", Meaning: "Token budget spent", Action: "Wait for the monthly reset, or ask for a top-up", Tone: "warn"},
-			{Code: "429", Meaning: "Too many requests this minute", Action: "Retry after the Retry-After header", Tone: "warn"},
-			{Code: "502", Meaning: "Embedding backend unavailable", Action: "Retry shortly", Tone: "bad"},
-			{Code: "503", Meaning: "Cancelled while queued", Action: "Retry", Tone: "warn"},
+			{Code: "200", Meaning: "Vektoriai grąžinti", Action: "—", Tone: "ok"},
+			{Code: "400", Meaning: "Netaisyklingas JSON arba per daug tekstų viename pakete", Action: "Pataisykite užklausą", Tone: "bad"},
+			{Code: "401", Meaning: "Rakto nėra, jis neteisingas arba atšauktas", Action: "Patikrinkite raktą", Tone: "bad"},
+			{Code: "402", Meaning: "Tokenų biudžetas išnaudotas", Action: "Palaukite mėnesio atnaujinimo arba paprašykite papildyti", Tone: "warn"},
+			{Code: "429", Meaning: "Per daug užklausų per minutę", Action: "Kartokite po Retry-After antraštėje nurodyto laiko", Tone: "warn"},
+			{Code: "502", Meaning: "Embeddingų serveris nepasiekiamas", Action: "Pakartokite netrukus", Tone: "bad"},
+			{Code: "503", Meaning: "Užklausa nutraukta belaukiant eilėje", Action: "Pakartokite", Tone: "warn"},
 		},
 	}
 }

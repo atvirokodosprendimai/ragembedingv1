@@ -84,10 +84,15 @@ func TestLandingIsPublic(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h := testRouter(t, dashboardStub(), BasicAuth("admin", "hunter2", logger))
 
-	w := get(t, h, "/")
-	require.Equal(t, http.StatusOK, w.Code)
-	require.Contains(t, w.Body.String(), "how to call the API")
-	require.NotContains(t, w.Body.String(), "every key")
+	for _, path := range []string{"/", "/kada-reikia-embeddingu-api", "/robots.txt", "/sitemap.xml", "/llms.txt"} {
+		w := get(t, h, path)
+		require.Equalf(t, http.StatusOK, w.Code, "public path %s", path)
+		require.NotContains(t, w.Body.String(), "every key")
+	}
+
+	// An unknown path must 404 rather than fall through to a marketing page: a
+	// mistyped API route answering 200 with HTML is worse than a clean error.
+	require.Equal(t, http.StatusNotFound, get(t, h, "/nera-tokio-puslapio").Code)
 }
 
 // TestHealthzStaysPublic: the liveness probe must not need a credential, or load
