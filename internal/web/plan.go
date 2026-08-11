@@ -43,6 +43,43 @@ func NewPlan(priceEUR, vatPercent int) Plan {
 	}
 }
 
+// ltPlural picks the Lithuanian form of a noun for a count.
+//
+// Lithuanian does not inflect on "is it one": the form follows the last digits.
+// 21 takes the singular, 25 the nominative plural, and 100 — along with
+// anything ending 11–19 — the genitive plural. The counts here come from
+// configuration rather than from prose, so the rule has to be applied; a page
+// that prints "100 užklausos" reads as broken Lithuanian to precisely the
+// audience it was written in Lithuanian for.
+//
+// Counts reaching this are validated positive at startup, so there is no
+// negative case to fold.
+func ltPlural(n int, one, few, many string) string {
+	switch last2, last1 := n%100, n%10; {
+	case last2 >= 11 && last2 <= 19:
+		return many
+	case last1 == 1:
+		return one
+	case last1 == 0:
+		return many
+	default:
+		return few
+	}
+}
+
+// ratePhrase and batchPhrase render the two limits the plan sells as Lithuanian
+// that agrees with its own numbers. They live beside the price because the plan
+// card and llms.txt both print them and must print them identically.
+func ratePhrase(perMin int) string {
+	return fmt.Sprintf("%d %s per minutę", perMin,
+		ltPlural(perMin, "užklausa", "užklausos", "užklausų"))
+}
+
+func batchPhrase(batchMax int) string {
+	return fmt.Sprintf("%d %s vienoje užklausoje", batchMax,
+		ltPlural(batchMax, "tekstas", "tekstai", "tekstų"))
+}
+
 // priceSentence is the offer as a clause that reads inside running prose, for
 // the two surfaces that cannot use the landing page's layout to carry meaning:
 // the article's FAQ answer and llms.txt. Both are lifted and quoted verbatim —

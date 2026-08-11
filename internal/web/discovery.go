@@ -75,8 +75,8 @@ func (s *LandingServer) handleLLMs(w http.ResponseWriter, r *http.Request) {
 	b.WriteString("## Kiek kainuoja\n\n")
 	b.WriteString("- Vienas planas: " + s.plan.priceSentence() + ".\n")
 	b.WriteString("- Mokesčio už apdorotą tokeną nėra; perindeksavimas sąskaitos nekeičia.\n")
-	b.WriteString(fmt.Sprintf("- Į kainą įeina: tokenai — %s, %d užklausos per minutę, %d tekstai vienoje užklausoje.\n\n",
-		tokenBudgetLabel(s.tokenBudget), s.ratePerMin, s.batchMax))
+	b.WriteString(fmt.Sprintf("- Į kainą įeina: tokenai — %s, %s, %s.\n\n",
+		tokenBudgetLabel(s.tokenBudget), ratePhrase(s.ratePerMin), batchPhrase(s.batchMax)))
 
 	b.WriteString("## Ko nedaro\n\n")
 	b.WriteString("- Negeneruoja teksto ir neatsakinėja į klausimus — tik verčia tekstą į vektorius.\n")

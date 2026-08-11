@@ -300,6 +300,15 @@ code {
 	font-variant-numeric: tabular-nums;
 }
 
+/* Set below the digits and pulled close, so "50 €" reads as one price rather
+   than a number that happens to be followed by a symbol. */
+.plan-currency {
+	font-size: 0.55em;
+	font-weight: 700;
+	margin-left: 0.22em;
+	vertical-align: 0.06em;
+}
+
 .plan-vat {
 	color: var(--ink-dim);
 	font-size: 13px;

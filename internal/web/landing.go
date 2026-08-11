@@ -99,6 +99,12 @@ type LandingVM struct {
 	// than asserted in markup — a page promising unlimited tokens while the
 	// gateway issues prepaid keys is the one drift that costs money.
 	TokenBudget string
+	// RatePhrase and BatchPhrase are the same two limits written as Lithuanian
+	// that agrees with its own numbers ("100 užklausų", but "21 užklausa").
+	// The limits section can get away with bare numbers under unit labels; the
+	// price section states them in sentences, where agreement is visible.
+	RatePhrase  string
+	BatchPhrase string
 	AdminPath   string
 	// Contact is who to ask for a key. There is no self-service signup, so
 	// without it the page tells a visitor to ask someone it cannot name.
@@ -130,6 +136,8 @@ func (s *LandingServer) build(r *http.Request) LandingVM {
 		BatchMax:    strconv.Itoa(s.batchMax),
 		RatePerMin:  strconv.Itoa(s.ratePerMin),
 		TokenBudget: tokenBudgetLabel(s.tokenBudget),
+		RatePhrase:  ratePhrase(s.ratePerMin),
+		BatchPhrase: batchPhrase(s.batchMax),
 		AdminPath:   BasePath,
 		Contact:     s.contact,
 		Plan:        s.plan,

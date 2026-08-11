@@ -236,7 +236,12 @@ templ planCard(vm LandingVM) {
 	<div class="plan">
 		<p class="plan-eyebrow">vienas planas</p>
 		<p class="plan-price">
-			<span class="plan-figure">{ vm.Plan.PriceExVAT }&nbsp;€</span>
+			// The symbol is nested inside the figure rather than set beside it: at
+			// 46px a full monospace space between "50" and "€" reads as a gap, not
+			// as one price.
+			<span class="plan-figure">
+				{ vm.Plan.PriceExVAT }<span class="plan-currency">€</span>
+			</span>
 			if vm.Plan.HasVAT() {
 				<span class="plan-vat">+ PVM</span>
 			}
@@ -250,8 +255,8 @@ templ planCard(vm LandingVM) {
 		}
 		<ul class="plan-includes">
 			<li><b>Tokenai — { vm.TokenBudget }</b>. Mokesčio už apdorotą tokeną nėra.</li>
-			<li><b>{ vm.RatePerMin } užklausos per minutę</b> vienam raktui.</li>
-			<li><b>{ vm.BatchMax } tekstai vienoje užklausoje</b> — paketais, ne po vieną.</li>
+			<li><b>{ vm.RatePhrase }</b> vienam raktui.</li>
+			<li><b>{ vm.BatchPhrase }</b> — paketais, ne po vieną.</li>
 		</ul>
 		<p class="plan-cta">
 			<a class="mailto" href="#raktas">

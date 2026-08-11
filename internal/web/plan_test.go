@@ -48,6 +48,41 @@ func TestNewPlanCentsDoNotDrift(t *testing.T) {
 	}
 }
 
+// TestLtPluralFollowsTheLastDigits pins the Lithuanian agreement rule. It is
+// not "one vs many": the form is chosen by the final digits, so 21 is singular
+// while 11 is not, and 100 takes the genitive that 25 does not.
+func TestLtPluralFollowsTheLastDigits(t *testing.T) {
+	cases := map[int]string{
+		1:   "užklausa", // singular
+		21:  "užklausa", // ...and every other -1, except the teens
+		101: "užklausa",
+		2:   "užklausos", // nominative plural for -2..-9
+		25:  "užklausos",
+		399: "užklausos",
+		10:  "užklausų", // genitive plural for -0
+		100: "užklausų",
+		11:  "užklausų", // ...and for the whole 11-19 band
+		19:  "užklausų",
+		111: "užklausų",
+	}
+	for n, want := range cases {
+		require.Equal(t, want, ltPlural(n, "užklausa", "užklausos", "užklausų"),
+			"count %d", n)
+	}
+}
+
+// TestLimitPhrasesAgreeWithTheirNumbers covers the two phrases the price
+// section prints as sentences, at the counts an operator is most likely to
+// configure.
+func TestLimitPhrasesAgreeWithTheirNumbers(t *testing.T) {
+	require.Equal(t, "100 užklausų per minutę", ratePhrase(100))
+	require.Equal(t, "400 užklausų per minutę", ratePhrase(400))
+	require.Equal(t, "1 užklausa per minutę", ratePhrase(1))
+	require.Equal(t, "25 tekstai vienoje užklausoje", batchPhrase(25))
+	require.Equal(t, "1 tekstas vienoje užklausoje", batchPhrase(1))
+	require.Equal(t, "10 tekstų vienoje užklausoje", batchPhrase(10))
+}
+
 // renderLanding fetches the public page as a visitor would, so the assertions
 // below run against the real handler rather than a hand-built view model.
 func renderLanding(t *testing.T, plan Plan, tokenBudget int64) string {
@@ -72,13 +107,14 @@ func TestLandingPublishesThePrice(t *testing.T) {
 	body := renderLanding(t, NewPlan(50, 21), -1)
 
 	require.Contains(t, body, "Kiek kainuoja")
-	require.Contains(t, body, "50&nbsp;€")
+	require.Contains(t, body, `<span class="plan-currency">€</span>`)
 	require.Contains(t, body, "+ PVM")
 	require.Contains(t, body, "60,50 € su PVM (21%)")
 	// The limits the price buys, each read from configuration rather than
 	// written into the markup.
 	require.Contains(t, body, "Tokenai — neriboti")
-	require.Contains(t, body, "100 užklausos per minutę")
+	// 100 takes the genitive plural in Lithuanian, not the nominative.
+	require.Contains(t, body, "100 užklausų per minutę")
 	require.Contains(t, body, "25 tekstai vienoje užklausoje")
 }
 
@@ -133,7 +169,7 @@ func TestLandingOfferIsMachineReadable(t *testing.T) {
 func TestLandingOmitsVATWhenNoneIsCharged(t *testing.T) {
 	body := renderLanding(t, NewPlan(50, 0), -1)
 
-	require.Contains(t, body, "50&nbsp;€")
+	require.Contains(t, body, `<span class="plan-currency">€</span>`)
 	require.NotContains(t, body, "+ PVM")
 	require.NotContains(t, body, "su PVM")
 }
@@ -163,7 +199,7 @@ func TestLLMsTxtStatesThePrice(t *testing.T) {
 	body := w.Body.String()
 	require.Contains(t, body, "## Kiek kainuoja")
 	require.Contains(t, body, "50 € + PVM per mėnesį (60,50 € su PVM)")
-	require.Contains(t, body, "tokenai — neriboti, 100 užklausos per minutę, 25 tekstai")
+	require.Contains(t, body, "tokenai — neriboti, 100 užklausų per minutę, 25 tekstai vienoje užklausoje")
 }
 
 // TestNewPlanWithoutVAT: an operator who is not VAT registered configures 0%,
