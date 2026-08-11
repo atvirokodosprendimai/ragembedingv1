@@ -92,7 +92,7 @@ func TestBuildQueueStates(t *testing.T) {
 // bare StripPrefix("/assets/") stopped matching and the stylesheet 404'd — the
 // whole UI rendered unstyled while every status-code assertion still passed.
 func TestDashboardServesItsStylesheetWhenMounted(t *testing.T) {
-	srv := NewServer(nil, nil, nil, "bge-m3", nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv := NewServer(nil, nil, nil, nil, "bge-m3", nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	// Mount exactly as the gateway does.
 	root := chi.NewRouter()
@@ -112,7 +112,7 @@ func TestDashboardServesItsStylesheetWhenMounted(t *testing.T) {
 // TestLandingServesItsStylesheet covers the same ground for the public page,
 // which is mounted at the site root rather than under a prefix.
 func TestLandingServesItsStylesheet(t *testing.T) {
-	h := NewLanding("bge-m3", 25, 400, slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
+	h := NewLanding("bge-m3", 25, 400, "info@ituoga.lt", slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
 
 	r := httptest.NewRequest(http.MethodGet, "/assets/landing.css", nil)
 	w := httptest.NewRecorder()

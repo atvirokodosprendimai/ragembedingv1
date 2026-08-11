@@ -363,9 +363,12 @@ code {
 	gap: 2px;
 }
 
+/* The rows are links now (real navigation), so the default underline has to go:
+   the row's own layout, dot and bar are the affordance. */
 .keyrow {
 	width: 100%;
 	text-align: left;
+	text-decoration: none;
 	background: transparent;
 	border: 1px solid transparent;
 	border-radius: 8px;

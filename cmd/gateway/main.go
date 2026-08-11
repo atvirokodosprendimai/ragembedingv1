@@ -15,7 +15,9 @@ import (
 
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/budget"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/config"
+	"github.com/atvirokodosprendimai/ragembedingv1/internal/domain/usage"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/httpapi"
+	"github.com/atvirokodosprendimai/ragembedingv1/internal/live"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/platform/database"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/proxy"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/queue"
@@ -55,6 +57,21 @@ func run(logger *slog.Logger) error {
 	keyRepo := database.NewAPIKeyRepo(db)
 	usageRepo := database.NewUsageRepo(db)
 
+	// Read side: one goroutine per key that somebody is currently watching. The
+	// request path writes usage once and publishes to it, so the dashboard shows
+	// a call the moment it is recorded instead of re-querying on a timer.
+	hub := live.NewHub(
+		func(ctx context.Context, keyID uint, now time.Time) (usage.Report, error) {
+			return usage.BuildReport(usage.ReportWindows(now), func(rg usage.Range) (int64, error) {
+				return usageRepo.SumTokens(ctx, keyID, rg.From, rg.To)
+			})
+		},
+		time.Now, live.DefaultResync, logger,
+	)
+	// The handler records through the hub's recorder: store first (authoritative),
+	// then notify. It still only sees its own narrow interface.
+	recorder := live.NewRecorder(usageRepo, hub)
+
 	// Enforcement collaborators.
 	limiter := ratelimit.New()
 	budgetChecker := budget.NewChecker(usageRepo, time.Now)
@@ -63,15 +80,15 @@ func run(logger *slog.Logger) error {
 	// how much of the Ollama pool is in use, so it must be shared by every
 	// request rather than created per handler.
 	pool := queue.New(cfg.Queue.MaxConcurrent, cfg.Queue.PromoteAfter)
-	embeddings := proxy.NewHandler(budgetChecker, limiter, usageRepo, forwarder, pool, cfg.EmbedModel, time.Now, logger)
+	embeddings := proxy.NewHandler(budgetChecker, limiter, recorder, forwarder, pool, cfg.EmbedModel, time.Now, logger)
 
 	// Operator dashboard over the same DB, plus a read-only view of the queue so
 	// it can show live pool pressure.
-	dashboard := web.NewServer(keyRepo, usageRepo, pool, cfg.EmbedModel, time.Now, logger)
+	dashboard := web.NewServer(keyRepo, usageRepo, pool, hub, cfg.EmbedModel, time.Now, logger)
 
 	// Public API documentation. It is built from the same config the gateway
 	// enforces, so the limits it advertises cannot drift from the real ones.
-	landing := web.NewLanding(cfg.EmbedModel, cfg.Defaults.BatchMax, cfg.Defaults.RatePerMin, logger)
+	landing := web.NewLanding(cfg.EmbedModel, cfg.Defaults.BatchMax, cfg.Defaults.RatePerMin, cfg.ContactEmail, logger)
 
 	// The dashboard is operator-only and is not served without a credential:
 	// it lists every key, its limits and its spend.

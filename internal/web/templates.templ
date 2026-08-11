@@ -18,7 +18,12 @@ templ Page(vm PageVM) {
 			<link rel="stylesheet" href={ BasePath + "/assets/dashboard.css" }/>
 		</head>
 		<body>
-			<div class="wrap" data-signals={ vm.SignalsInit }>
+			// One connection for the whole page. The server decides what to push and
+			// how often — the pressure strip on its own cadence, this key's usage the
+			// moment a call is recorded against it — so there is no polling here and
+			// no client-side state to keep in step. Navigating away closes it, which
+			// is what retires the key's goroutine on the server.
+			<div class="wrap" data-init={ "@get('" + vm.LiveURL + "')" }>
 				<header class="masthead">
 					<div class="brand">
 						<span class="prompt">▉</span>
@@ -28,30 +33,14 @@ templ Page(vm PageVM) {
 					<div class="meta">
 						<span class="chip" title="embedding model">{ vm.Model }</span>
 						<span class="stat"><b>{ intStr(vm.TotalKeys) }</b> keys</span>
-						<span class="stat"><b class="amber">{ vm.TokensTodayLabel }</b> tokens today</span>
+						@TokensToday(vm.TokensTodayLabel)
 					</div>
 				</header>
 				if vm.HasKeys {
-					<section
-						class="panel pressure"
-						aria-label="Upstream pool pressure"
-						data-indicator:_queueSync
-						data-on-interval__duration.5s={ "$_queueLive && @get('" + BasePath + "/queue')" }
-					>
+					<section class="panel pressure" aria-label="Upstream pool pressure">
 						<div class="panel-head pressure-head">
 							<span><span class="tick">┌─</span> pool pressure</span>
-							<span class="pressure-actions">
-								<span class="live" data-show="$_queueLive" style="display:none">● live</span>
-								<span class="loading" data-show="$_queueSync" style="display:none" aria-hidden="true">syncing</span>
-								<button
-									type="button"
-									class="ghost"
-									aria-label="Toggle live pool updates"
-									data-attr:aria-pressed="$_queueLive"
-									data-on:click="$_queueLive = !$_queueLive"
-									data-text="$_queueLive ? '❚❚ pause' : '▶ resume'"
-								>❚❚ pause</button>
-							</span>
+							<span class="live">● streaming</span>
 						</div>
 						@QueuePanel(vm.Queue)
 					</section>
@@ -68,10 +57,7 @@ templ Page(vm PageVM) {
 								}
 							</ul>
 						</nav>
-						<section
-							class="panel detailcol"
-							data-on-interval__duration.30s={ "$selectedKey && @get('" + BasePath + "/keys/' + $selectedKey)" }
-						>
+						<section class="panel detailcol">
 							@Detail(*vm.Detail)
 						</section>
 					</main>
@@ -138,16 +124,27 @@ templ QueuePanel(q QueueVM) {
 	</div>
 }
 
-// keyRow is one selectable key in the sidebar. It is a real <button> so it is
-// keyboard-reachable and focusable; datastar drives selection and the fetch.
+// TokensToday is the masthead's aggregate. It is its own component with a
+// stable id so the live stream can keep it in step with the key it is watching,
+// rather than leaving the header contradicting the panel below it.
+templ TokensToday(label string) {
+	<span id="tokens-today" class="stat"><b class="amber">{ label }</b> tokens today</span>
+}
+
+// keyRow is one key in the sidebar. It is a plain link, not a scripted button:
+// the dashboard is a multi-page app, so a key is a place you navigate to — it
+// can be bookmarked, opened in a new tab, and reached with the back button.
+// aria-current marks the one being shown, which is what a screen reader
+// announces rather than the colour.
 templ keyRow(k KeyListItem) {
-	<button
-		type="button"
-		class="keyrow"
-		data-on:click={ k.OnClick }
-		data-indicator:_fetching
-		data-class:active={ k.ActiveExpr }
-		aria-label={ "View usage for " + k.Label }
+	<a
+		id={ "keyrow-" + uintStr(k.ID) }
+		href={ templ.SafeURL(k.Href) }
+		class={ "keyrow", templ.KV("active", k.Current) }
+		if k.Current {
+			aria-current="page"
+		}
+		aria-label={ "Usage for " + k.Label }
 	>
 		<span class="row-top">
 			<span class={ "dot", k.StatusClass } aria-hidden="true"></span>
@@ -163,14 +160,14 @@ templ keyRow(k KeyListItem) {
 		<span class="bar" aria-hidden="true">
 			<span class="bar-fill" style={ "width:" + k.Width }></span>
 		</span>
-	</button>
+	</a>
 }
 
 // Detail is the selected key's panel. Its root carries id="detail" so datastar
 // morphs it in place; the same component renders both inline and as the SSE
 // fragment, so there is a single source of truth for the layout.
 templ Detail(d DetailVM) {
-	<div id="detail" class="detail" data-class:loading="$_fetching">
+	<div id="detail" class="detail">
 		<div class="detail-head">
 			<div>
 				<h2 class="detail-title">
@@ -182,8 +179,7 @@ templ Detail(d DetailVM) {
 				<div class="detail-id faint">id { uintStr(d.ID) }</div>
 			</div>
 			<div class="detail-actions">
-				<span class="loading" data-show="$_fetching" style="display:none" aria-hidden="true">● syncing</span>
-				<button type="button" class="ghost" data-on:click={ d.RefreshExpr } aria-label="Refresh usage">↻ refresh</button>
+				<span class="live" title="updates stream as calls are recorded">● live</span>
 			</div>
 		</div>
 		<dl class="limits">

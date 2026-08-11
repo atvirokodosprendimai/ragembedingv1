@@ -10,6 +10,7 @@ import (
 
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/domain/apikey"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/domain/usage"
+	"github.com/atvirokodosprendimai/ragembedingv1/internal/live"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/queue"
 )
 
@@ -44,25 +45,27 @@ type PageVM struct {
 	Model            string        // embedding model badge (bge-m3)
 	TotalKeys        int           // count for the masthead
 	TokensTodayLabel string        // aggregate tokens today, humanized
-	SignalsInit      string        // data-signals JSON, e.g. {selectedKey: 3}
 	HasKeys          bool          // false => render the empty state
+	LiveURL          string        // the one SSE stream this page subscribes to
 	Queue            QueueVM       // live admission-queue pressure strip
 	Keys             []KeyListItem // sidebar rows
-	Detail           *DetailVM     // initially-selected key detail (nil if none)
+	Detail           *DetailVM     // the selected key's detail (nil if none)
 }
 
-// KeyListItem is one row in the key sidebar.
+// KeyListItem is one row in the key sidebar. Each row is a plain link: the
+// dashboard is a multi-page app, so selecting a key is navigation — it has a
+// URL, a history entry, and works with the back button and middle-click.
 type KeyListItem struct {
 	ID          uint
 	Label       string // name, or "key #id" when unnamed
+	Href        string // "/admin/keys/3"
+	Current     bool   // the key this page is showing
 	StatusClass string // "active" | "revoked" (drives the status dot colour)
 	Revoked     bool
 	Elevated    bool   // priority above the free tier => show the rank tag
 	PrioLabel   string // "p9"
 	TodayLabel  string // tokens today, humanized
 	Width       string // today bar width, e.g. "42%"
-	OnClick     string // datastar expression: select + fetch detail
-	ActiveExpr  string // datastar expression: is this row selected
 }
 
 // QueueVM is the live admission-queue strip: how much of the Ollama pool is
@@ -114,7 +117,6 @@ type DetailVM struct {
 	BudgetLabel string     // "unlimited" or humanized allowance
 	Period      string     // monthly | lifetime
 	Buckets     []BucketVM // the five reporting buckets
-	RefreshExpr string     // datastar expression to re-fetch this detail
 
 	HasBudget            bool   // true for prepaid keys (draws the meter)
 	Over                 bool   // budget exhausted (meter turns red)
@@ -133,7 +135,7 @@ type BucketVM struct {
 
 // buildPage assembles the full page: every key with its today total, the
 // aggregate, and the newest key's detail pre-selected.
-func (s *Server) buildPage(ctx context.Context) (PageVM, error) {
+func (s *Server) buildPage(ctx context.Context, selected uint) (PageVM, error) {
 	keys, err := s.keys.List(ctx)
 	if err != nil {
 		return PageVM{}, err
@@ -161,50 +163,54 @@ func (s *Server) buildPage(ctx context.Context) (PageVM, error) {
 		TokensTodayLabel: humanize.Comma(totalToday),
 		HasKeys:          len(keys) > 0,
 		Queue:            buildQueue(s.pool.Stats()),
-		SignalsInit:      signalsInit(0),
+		LiveURL:          fmt.Sprintf("%s/keys/%d/live", BasePath, selected),
 	}
+
+	found := -1
 	for i, k := range keys {
+		if k.ID == selected {
+			found = i
+		}
 		vm.Keys = append(vm.Keys, KeyListItem{
 			ID:          k.ID,
 			Label:       keyLabel(k),
+			Href:        fmt.Sprintf("%s/keys/%d", BasePath, k.ID),
+			Current:     k.ID == selected,
 			StatusClass: statusClass(k),
 			Revoked:     k.IsRevoked(),
 			Elevated:    k.Priority > apikey.NormalPriority,
 			PrioLabel:   priorityLabel(k.Priority),
 			TodayLabel:  humanize.Comma(todays[i]),
 			Width:       barWidth(todays[i], maxToday),
-			// selectedKey has no underscore so it round-trips to the backend; the
-			// @get patches #detail with the chosen key.
-			OnClick:    fmt.Sprintf("$selectedKey = %d; @get('%s/keys/%d')", k.ID, BasePath, k.ID),
-			ActiveExpr: fmt.Sprintf("$selectedKey === %d", k.ID),
 		})
 	}
-	if len(keys) > 0 {
-		// Default to the first active key so the landing view shows a live key
-		// rather than a revoked one; fall back to the newest if all are revoked.
-		def := 0
-		for i, k := range keys {
-			if !k.IsRevoked() {
-				def = i
-				break
-			}
-		}
-		detail, err := s.buildDetail(ctx, keys[def], now)
-		if err != nil {
-			return PageVM{}, err
-		}
-		vm.Detail = &detail
-		vm.SignalsInit = signalsInit(keys[def].ID)
+	if found < 0 {
+		// The URL names a key that does not exist. Surfacing the domain sentinel
+		// lets the handler answer 404 rather than render a page about nothing.
+		return PageVM{}, apikey.ErrNotFound
 	}
+
+	detail, err := s.buildDetail(ctx, keys[found], now)
+	if err != nil {
+		return PageVM{}, err
+	}
+	vm.Detail = &detail
 	return vm, nil
 }
 
-// signalsInit is the page's datastar signal seed. selectedKey round-trips to the
-// backend (it names the key whose detail to fetch); _queueLive is underscored so
-// it stays on the client — it only decides whether the pressure strip keeps
-// polling, and the server has no use for it.
-func signalsInit(selectedKey uint) string {
-	return fmt.Sprintf("{selectedKey: %d, _queueLive: true}", selectedKey)
+// defaultKeyID picks the key the bare /admin URL should open: the first active
+// one, so the operator lands on a key that is actually in use rather than a
+// revoked one. It reports false when there are no keys at all.
+func defaultKeyID(keys []apikey.APIKey) (uint, bool) {
+	if len(keys) == 0 {
+		return 0, false
+	}
+	for _, k := range keys {
+		if !k.IsRevoked() {
+			return k.ID, true
+		}
+	}
+	return keys[0].ID, true
 }
 
 // buildQueue projects a queue snapshot into the pressure strip. All the
@@ -264,9 +270,8 @@ func shortDuration(d time.Duration) string {
 	return fmt.Sprintf("%.1fs", d.Seconds())
 }
 
-// buildDetail computes the five buckets and, for prepaid keys, the budget meter
-// for one key. Lifetime and monthly usage are derived from the disjoint buckets
-// (this month + past month + before = all time), so no extra query is needed.
+// buildDetail reads a key's report from the store and projects it. It is the
+// first-paint path: the page render, before the live stream takes over.
 func (s *Server) buildDetail(ctx context.Context, k apikey.APIKey, now time.Time) (DetailVM, error) {
 	w := usage.ReportWindows(now)
 	rep, err := usage.BuildReport(w, func(r usage.Range) (int64, error) {
@@ -275,7 +280,22 @@ func (s *Server) buildDetail(ctx context.Context, k apikey.APIKey, now time.Time
 	if err != nil {
 		return DetailVM{}, err
 	}
+	return detailVM(k, rep), nil
+}
 
+// detailFrom projects a live snapshot. It is the streaming path, and it shares
+// detailVM with the first paint so a pushed update and a fresh page render can
+// never disagree about how a number is displayed.
+func (s *Server) detailFrom(k apikey.APIKey, snap live.Snapshot) DetailVM {
+	return detailVM(k, snap.Report)
+}
+
+// detailVM turns a key and its report into the panel: the five buckets and, for
+// prepaid keys, the budget meter. Lifetime and monthly usage are derived from
+// the disjoint buckets (this month + past month + before = all time), so no
+// extra query is needed. It touches neither the clock nor the database, which is
+// what lets the live stream reuse it.
+func detailVM(k apikey.APIKey, rep usage.Report) DetailVM {
 	peak := max(rep.Today, rep.ThisWeek, rep.ThisMonth, rep.PastMonth, rep.Before)
 	d := DetailVM{
 		ID:          k.ID,
@@ -287,7 +307,6 @@ func (s *Server) buildDetail(ctx context.Context, k apikey.APIKey, now time.Time
 		Elevated:    k.Priority > apikey.NormalPriority,
 		BudgetLabel: budgetLabel(k.TokenBudget),
 		Period:      string(k.BudgetPeriod),
-		RefreshExpr: fmt.Sprintf("@get('%s/keys/%d')", BasePath, k.ID),
 		Buckets: []BucketVM{
 			{Label: "today", TokensLabel: humanize.Comma(rep.Today), Width: barWidth(rep.Today, peak), Emphasis: true},
 			{Label: "this week", TokensLabel: humanize.Comma(rep.ThisWeek), Width: barWidth(rep.ThisWeek, peak)},
@@ -312,7 +331,7 @@ func (s *Server) buildDetail(ctx context.Context, k apikey.APIKey, now time.Time
 		d.BudgetRemainingLabel = humanize.Comma(remaining)
 		d.BudgetWidth = fmt.Sprintf("%d%%", pct)
 	}
-	return d, nil
+	return d
 }
 
 // keyLabel is the display name for a key, falling back to its id when unnamed.
@@ -349,4 +368,62 @@ func barWidth(value, peak int64) string {
 		pct = 2
 	}
 	return fmt.Sprintf("%d%%", pct)
+}
+
+// sidebarCtx is the bit of page state a live stream needs to keep the sidebar
+// row and the masthead total in step with the panel it is pushing. It is read
+// once when the stream opens: the figures for *other* keys do not move while an
+// operator watches this one, and re-querying them on every push would put the
+// database back in the hot path that the read side exists to keep it out of.
+type sidebarCtx struct {
+	othersToday int64 // today's tokens across every other key
+	peakToday   int64 // largest today figure, for bar scaling
+}
+
+// sidebarContext reads the sidebar figures for keyID's stream.
+func (s *Server) sidebarContext(ctx context.Context, keyID uint) (sidebarCtx, error) {
+	keys, err := s.keys.List(ctx)
+	if err != nil {
+		return sidebarCtx{}, err
+	}
+	now := s.now()
+	from := usage.ReportWindows(now).Today.From
+
+	var sc sidebarCtx
+	for _, k := range keys {
+		today, err := s.usage.SumTokens(ctx, k.ID, from, now)
+		if err != nil {
+			return sidebarCtx{}, err
+		}
+		sc.peakToday = max(sc.peakToday, today)
+		if k.ID != keyID {
+			sc.othersToday += today
+		}
+	}
+	return sc, nil
+}
+
+// row rebuilds the watched key's sidebar row around a fresh today figure. The
+// row is always the current one — it is the key whose page this is.
+func (c sidebarCtx) row(k apikey.APIKey, today int64) KeyListItem {
+	return KeyListItem{
+		ID:          k.ID,
+		Label:       keyLabel(k),
+		Href:        fmt.Sprintf("%s/keys/%d", BasePath, k.ID),
+		Current:     true,
+		StatusClass: statusClass(k),
+		Revoked:     k.IsRevoked(),
+		Elevated:    k.Priority > apikey.NormalPriority,
+		PrioLabel:   priorityLabel(k.Priority),
+		TodayLabel:  humanize.Comma(today),
+		// A key that has just overtaken the previous peak scales against itself,
+		// so its bar fills rather than overflowing.
+		Width: barWidth(today, max(c.peakToday, today)),
+	}
+}
+
+// totalLabel is the masthead aggregate with the watched key's fresh figure
+// swapped in for its stale one.
+func (c sidebarCtx) totalLabel(today int64) string {
+	return humanize.Comma(c.othersToday + today)
 }
