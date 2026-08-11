@@ -12,9 +12,15 @@
 //
 //  1. Anti-starvation. A request queued longer than promoteAfter is admitted
 //     ahead of everything else, oldest first. Free traffic therefore always
-//     drains — it is never indefinitely postponed by priority work.
+//     drains — it is never indefinitely postponed by priority work. Promotions
+//     alternate: two never run back to back, so a backlog in which everything
+//     has aged out cannot bury priority traffic under it.
 //  2. Strict priority. Otherwise the highest-priority waiter goes first, FIFO
 //     within a priority class.
+//
+// Under saturation the two rules split the pool: aged traffic takes every other
+// slot, priority traffic the rest. A priority request therefore waits for at
+// most one extra admission, however deep the backlog behind it.
 //
 // Released slots are handed directly to the chosen waiter rather than returned
 // to a free pool, so a newly arrived request can never barge past a queue.

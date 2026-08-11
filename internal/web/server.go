@@ -14,6 +14,7 @@ import (
 
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/domain/apikey"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/domain/usage"
+	"github.com/atvirokodosprendimai/ragembedingv1/internal/queue"
 )
 
 // assets embeds the dashboard stylesheet so the gateway serves it itself, with
@@ -23,12 +24,21 @@ import (
 //go:embed static/dashboard.css
 var assets embed.FS
 
+// poolReporter is the dashboard's read-only view of the admission queue. It is
+// declared at the consumer so the dashboard depends on "tell me the pressure"
+// and nothing else — it can neither admit nor release.
+type poolReporter interface {
+	Stats() queue.Stats
+}
+
 // Server renders the operator usage dashboard over the key and usage stores. It
-// is read-only: it reports what keys exist and how many bge-m3 tokens each has
-// spent across the reporting buckets, but issues no keys (that is ragctl's job).
+// is read-only: it reports what keys exist, how many bge-m3 tokens each has
+// spent across the reporting buckets, and how contended the Ollama pool is right
+// now, but issues no keys (that is ragctl's job).
 type Server struct {
 	keys   apikey.Repository
 	usage  usage.Repository
+	pool   poolReporter
 	model  string
 	now    func() time.Time
 	logger *slog.Logger
@@ -36,14 +46,14 @@ type Server struct {
 
 // NewServer constructs the dashboard server. now is injectable so bucket
 // boundaries are deterministic in tests.
-func NewServer(keys apikey.Repository, usage usage.Repository, model string, now func() time.Time, logger *slog.Logger) *Server {
+func NewServer(keys apikey.Repository, usage usage.Repository, pool poolReporter, model string, now func() time.Time, logger *slog.Logger) *Server {
 	if now == nil {
 		now = time.Now
 	}
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Server{keys: keys, usage: usage, model: model, now: now, logger: logger}
+	return &Server{keys: keys, usage: usage, pool: pool, model: model, now: now, logger: logger}
 }
 
 // Handler returns the dashboard's routes: the full page, the per-key detail
@@ -52,6 +62,7 @@ func (s *Server) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", s.handleIndex)
 	r.Get("/keys/{id}", s.handleKeyDetail)
+	r.Get("/queue", s.handleQueue)
 
 	// Serve /assets/dashboard.css from the embedded FS.
 	sub, _ := fs.Sub(assets, "static")
@@ -71,6 +82,16 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if err := Page(vm).Render(r.Context(), w); err != nil {
 		// The header is already committed; log and move on.
 		s.logger.Error("dashboard: render page", "err", err)
+	}
+}
+
+// handleQueue patches the live pressure strip. It is polled every couple of
+// seconds while the panel is live, so it must stay cheap: reading the queue is
+// one mutex-guarded snapshot with no database work at all.
+func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
+	sse := datastar.NewSSE(w, r)
+	if err := sse.PatchElementTempl(QueuePanel(buildQueue(s.pool.Stats()))); err != nil {
+		s.logger.Error("dashboard: patch queue", "err", err)
 	}
 }
 

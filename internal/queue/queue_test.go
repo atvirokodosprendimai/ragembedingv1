@@ -311,3 +311,61 @@ func TestConcurrentAcquireNeverExceedsCapacity(t *testing.T) {
 	require.Equal(t, 0, q.Stats().InFlight)
 	require.Equal(t, uint64(workers), q.Stats().Admitted)
 }
+
+// TestDeepAgedBacklogCannotBuryPriority is the regression test for the failure a
+// real load run exposed: with capacity 2 and a 20-deep free backlog, every
+// waiter aged past the promotion window, so promoting them all in arrival order
+// turned the queue back into FIFO and the priority key waited ~7x longer than it
+// should have. Promotions must alternate with strict-priority admissions.
+func TestDeepAgedBacklogCannotBuryPriority(t *testing.T) {
+	clock := newFakeClock()
+	q := NewWithClock(1, 5*time.Second, clock.Now)
+	hold, err := q.Acquire(context.Background(), 0)
+	require.NoError(t, err)
+
+	// A deep free backlog, all of it queued before the priority request and all
+	// of it old enough to be promoted.
+	const backlog = 10
+	admitted := make(chan int, backlog+1)
+	for i := 1; i <= backlog; i++ {
+		enqueue(t, q, 0, admitted)
+		waitForWaiting(t, q, i)
+	}
+	clock.Advance(30 * time.Second)
+	enqueue(t, q, 9, admitted)
+	waitForWaiting(t, q, backlog+1)
+
+	// Drain: the aged backlog gets every other slot, so the priority request is
+	// served second rather than after all ten.
+	hold()
+	require.Equal(t, 0, <-admitted, "an aged waiter takes the first slot")
+	require.Equal(t, 9, <-admitted, "priority must not wait for the whole backlog")
+}
+
+// TestPromotionsAlternateUnderSustainedPressure pins the split the alternation
+// produces: with both classes always contending, aged traffic and priority
+// traffic take every other slot.
+func TestPromotionsAlternateUnderSustainedPressure(t *testing.T) {
+	clock := newFakeClock()
+	q := NewWithClock(1, 5*time.Second, clock.Now)
+	hold, err := q.Acquire(context.Background(), 0)
+	require.NoError(t, err)
+
+	admitted := make(chan int, 6)
+	for i := 1; i <= 3; i++ {
+		enqueue(t, q, 0, admitted)
+		waitForWaiting(t, q, i)
+	}
+	clock.Advance(30 * time.Second) // the free waiters are all promotable
+	for i := 1; i <= 3; i++ {
+		enqueue(t, q, 9, admitted)
+		waitForWaiting(t, q, 3+i)
+	}
+
+	hold()
+	got := make([]int, 0, 6)
+	for range 6 {
+		got = append(got, <-admitted)
+	}
+	require.Equal(t, []int{0, 9, 0, 9, 0, 9}, got)
+}

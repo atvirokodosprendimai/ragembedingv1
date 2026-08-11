@@ -13,6 +13,8 @@
 	--ink-faint: #5a6b65;
 	--amber: #ffb454;
 	--amber-dim: #c98a3f;
+	/* one step hotter than the accent, for a pool with every slot busy */
+	--amber-hot: #ff8f5a;
 	--green: #6fd08c;
 	--red: #ff6a6a;
 	--mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
@@ -137,6 +139,186 @@ code {
 	font-variant-numeric: tabular-nums;
 }
 
+/* --- pool pressure ----------------------------------------------------- */
+
+/* The strip sits between the masthead and the key list: it answers "is the pool
+   busy and is anyone waiting for it" before the reader gets to per-key detail. */
+
+.pressure {
+	margin-top: 18px;
+}
+
+.pressure-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+/* The controls carry their own casing; the panel head's uppercase tracking is
+   for the title only. */
+.pressure-actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	text-transform: none;
+	letter-spacing: normal;
+	font-size: 11px;
+}
+
+.live {
+	color: var(--green);
+	animation: blink 2s steps(1) infinite;
+}
+
+.queue {
+	padding: 14px 16px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.queue-slots {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.queue-label {
+	color: var(--ink-faint);
+	text-transform: uppercase;
+	letter-spacing: 0.14em;
+	font-size: 9px;
+	width: 34px;
+	flex: none;
+}
+
+/* One block per concurrent slot, flexed so a pool of 4 or 40 fills the same
+   row. The numeric label beside it always carries the exact figure. */
+.slots {
+	display: flex;
+	gap: 3px;
+	flex: 1;
+	height: 18px;
+}
+
+.slot {
+	flex: 1 1 0;
+	min-width: 2px;
+	border-radius: 2px;
+	border: 1px solid var(--line);
+	background: rgba(255, 255, 255, 0.04);
+	transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.slot.busy {
+	background: linear-gradient(180deg, var(--amber), var(--amber-dim));
+	border-color: transparent;
+	box-shadow: 0 0 10px -3px var(--amber);
+}
+
+/* Saturated: every slot busy, so anything arriving now queues. */
+.queue.hot .slot.busy {
+	background: linear-gradient(180deg, var(--amber-hot), #c9542b);
+	box-shadow: 0 0 12px -2px var(--amber-hot);
+}
+
+.queue-num {
+	font-size: 13px;
+	font-weight: 700;
+	min-width: 58px;
+	text-align: right;
+}
+
+.queue-classes {
+	display: flex;
+	flex-direction: column;
+	gap: 7px;
+}
+
+.qclass {
+	display: grid;
+	grid-template-columns: 42px 1fr 38px 54px;
+	align-items: center;
+	gap: 10px;
+}
+
+.qtag {
+	text-align: center;
+	font-size: 10px;
+	letter-spacing: 0.06em;
+	padding: 2px 0;
+	border-radius: 4px;
+	border: 1px solid var(--line-2);
+	color: var(--ink-dim);
+}
+
+/* The best rank currently waiting — the one the operator cares about most. */
+.qtag.top {
+	color: var(--amber);
+	border-color: rgba(255, 180, 84, 0.45);
+	background: rgba(255, 180, 84, 0.08);
+}
+
+/* Past the promotion window: the anti-starvation valve is working, which is
+   good news, so it reads green rather than as an alarm. */
+.qtag.aged {
+	color: var(--green);
+	border-color: rgba(111, 208, 140, 0.45);
+	background: rgba(111, 208, 140, 0.08);
+}
+
+.qbar {
+	height: 8px;
+	background: rgba(255, 255, 255, 0.045);
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.qfill {
+	display: block;
+	height: 100%;
+	background: linear-gradient(90deg, rgba(255, 180, 84, 0.3), var(--amber-dim));
+	border-radius: 3px;
+	transition: width 0.3s ease;
+}
+
+.qcount {
+	font-size: 12px;
+	font-weight: 700;
+	text-align: right;
+}
+
+.qwait {
+	font-size: 11px;
+	text-align: right;
+}
+
+.queue-note {
+	margin: 0;
+	font-size: 11px;
+}
+
+.queue-foot {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 10px;
+	flex-wrap: wrap;
+	padding-top: 10px;
+	border-top: 1px solid var(--line);
+	color: var(--ink-dim);
+	font-size: 11px;
+}
+.queue-foot b {
+	color: var(--ink);
+}
+
+.promo-note {
+	color: var(--green);
+}
+
 /* --- layout ----------------------------------------------------------- */
 
 .grid {
@@ -251,6 +433,19 @@ code {
 	padding: 1px 5px;
 }
 
+/* Only keys above the free tier carry this, so the tag itself is the signal
+   that this key jumps the queue. */
+.tag-prio {
+	color: var(--amber);
+	border: 1px solid rgba(255, 180, 84, 0.4);
+	background: rgba(255, 180, 84, 0.07);
+	border-radius: 4px;
+	font-size: 9px;
+	letter-spacing: 0.1em;
+	padding: 1px 5px;
+	flex: none;
+}
+
 /* bars */
 
 .bar {
@@ -330,19 +525,28 @@ code {
 	border-color: var(--amber-dim);
 	color: var(--amber);
 }
+.ghost:active {
+	background: rgba(255, 180, 84, 0.1);
+}
+
+/* On touch input the compact desktop hit area is too small to aim at, so the
+   controls grow to the 44px minimum. */
+@media (pointer: coarse) {
+	.ghost {
+		min-height: 44px;
+		padding: 10px 16px;
+	}
+}
 
 /* limits */
 
+/* auto-fit rather than a fixed column count: the stats reflow from five across
+   to two without a breakpoint per count. */
 .limits {
 	display: grid;
-	grid-template-columns: repeat(4, 1fr);
+	grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
 	gap: 10px;
 	margin: 16px 0 20px;
-}
-@media (max-width: 520px) {
-	.limits {
-		grid-template-columns: repeat(2, 1fr);
-	}
 }
 
 .limit {
@@ -350,6 +554,16 @@ code {
 	border-radius: 8px;
 	padding: 9px 11px;
 	background: rgba(255, 255, 255, 0.012);
+}
+
+/* An accented stat is what makes this key different from the default — a rank
+   above the free tier. */
+.limit.accent {
+	border-color: rgba(255, 180, 84, 0.35);
+	background: rgba(255, 180, 84, 0.05);
+}
+.limit.accent dd {
+	color: var(--amber);
 }
 .limit dt {
 	color: var(--ink-faint);

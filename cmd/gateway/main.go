@@ -65,8 +65,9 @@ func run(logger *slog.Logger) error {
 	pool := queue.New(cfg.Queue.MaxConcurrent, cfg.Queue.PromoteAfter)
 	embeddings := proxy.NewHandler(budgetChecker, limiter, usageRepo, forwarder, pool, cfg.EmbedModel, time.Now, logger)
 
-	// Operator dashboard over the same DB.
-	dashboard := web.NewServer(keyRepo, usageRepo, cfg.EmbedModel, time.Now, logger)
+	// Operator dashboard over the same DB, plus a read-only view of the queue so
+	// it can show live pool pressure.
+	dashboard := web.NewServer(keyRepo, usageRepo, pool, cfg.EmbedModel, time.Now, logger)
 
 	router := httpapi.Router{
 		Keys:       keyRepo,

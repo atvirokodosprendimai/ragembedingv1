@@ -55,6 +55,12 @@ type Queue struct {
 	// deleted so the map stays as small as the live traffic mix.
 	classes map[int]*list.List
 	waiting int
+	// justPromoted records that the previous admission was an anti-starvation
+	// promotion, so the next one follows strict priority. Without this, a backlog
+	// deep enough for every waiter to age out would promote them all in arrival
+	// order and priority would silently degrade to FIFO — the exact failure this
+	// queue exists to prevent.
+	justPromoted bool
 
 	// Lifetime counters, surfaced through Stats for the dashboard.
 	admitted  uint64
@@ -209,13 +215,22 @@ func (q *Queue) popLocked(now time.Time) (*waiter, bool) {
 	if top == nil {
 		return nil, false
 	}
-	// Anti-starvation beats rank: a waiter that has been queued longer than
-	// promoteAfter goes first even if higher-priority work is waiting. Without
-	// this, sustained priority traffic would postpone free traffic forever.
-	if oldest != top && now.Sub(oldest.since) >= q.promoteAfter {
+	// Anti-starvation beats rank: a waiter queued longer than promoteAfter goes
+	// first even if higher-priority work is waiting. Without it, sustained
+	// priority traffic would postpone free traffic forever.
+	//
+	// But it alternates: two promotions never run back to back. A backlog deep
+	// enough that every waiter has aged out would otherwise be promoted wholesale
+	// in arrival order, burying the priority key behind all of it — measured at
+	// ~7x the priority key's latency before this guard. Alternating bounds the
+	// priority wait at one extra admission while still handing aged traffic every
+	// other slot.
+	if !q.justPromoted && oldest != top && now.Sub(oldest.since) >= q.promoteAfter {
+		q.justPromoted = true
 		q.removeLocked(oldest)
 		return oldest, true
 	}
+	q.justPromoted = false
 	q.removeLocked(top)
 	return top, false
 }
@@ -233,6 +248,10 @@ type Stats struct {
 	Capacity int
 	InFlight int
 	Waiting  int
+	// PromoteAfter is the configured anti-starvation window, carried here so a
+	// reader (the dashboard) can tell "waiting" from "waiting long enough to be
+	// promoted" without being wired to config separately.
+	PromoteAfter time.Duration
 	// Classes holds every non-empty priority class, highest priority first.
 	Classes []ClassStat
 	// OldestWait is how long the longest-waiting request has been queued.
@@ -250,12 +269,13 @@ func (q *Queue) Stats() Stats {
 
 	now := q.clock()
 	s := Stats{
-		Capacity:  q.capacity,
-		InFlight:  q.capacity - q.free,
-		Waiting:   q.waiting,
-		Admitted:  q.admitted,
-		Promoted:  q.promoted,
-		Cancelled: q.cancelled,
+		Capacity:     q.capacity,
+		InFlight:     q.capacity - q.free,
+		Waiting:      q.waiting,
+		PromoteAfter: q.promoteAfter,
+		Admitted:     q.admitted,
+		Promoted:     q.promoted,
+		Cancelled:    q.cancelled,
 	}
 	for p, l := range q.classes {
 		head := l.Front().Value.(*waiter)

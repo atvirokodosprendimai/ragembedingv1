@@ -28,6 +28,29 @@ templ Page(vm PageVM) {
 					</div>
 				</header>
 				if vm.HasKeys {
+					<section
+						class="panel pressure"
+						aria-label="Upstream pool pressure"
+						data-indicator:_queueSync
+						data-on-interval__duration.2s="$_queueLive && @get('/queue')"
+					>
+						<div class="panel-head pressure-head">
+							<span><span class="tick">┌─</span> pool pressure</span>
+							<span class="pressure-actions">
+								<span class="live" data-show="$_queueLive" style="display:none">● live</span>
+								<span class="loading" data-show="$_queueSync" style="display:none" aria-hidden="true">syncing</span>
+								<button
+									type="button"
+									class="ghost"
+									aria-label="Toggle live pool updates"
+									data-attr:aria-pressed="$_queueLive"
+									data-on:click="$_queueLive = !$_queueLive"
+									data-text="$_queueLive ? '❚❚ pause' : '▶ resume'"
+								>❚❚ pause</button>
+							</span>
+						</div>
+						@QueuePanel(vm.Queue)
+					</section>
 					<main class="grid">
 						<nav class="panel keys" aria-label="API keys">
 							<div class="panel-head">
@@ -60,6 +83,57 @@ templ Page(vm PageVM) {
 	</html>
 }
 
+// QueuePanel is the live admission-queue strip: how contended the Ollama pool is
+// right now, who is waiting for it, and whether anyone has waited long enough to
+// be promoted past the priority order. Its root carries id="queue" so datastar
+// morphs it in place on each poll, and the same component renders both the first
+// paint and the SSE fragment — one source of truth for the layout.
+templ QueuePanel(q QueueVM) {
+	<div id="queue" class={ "queue", templ.KV("hot", q.Saturated), templ.KV("aged", q.Aged) }>
+		<div class="queue-slots">
+			<span class="queue-label">slots</span>
+			<span class="slots" role="img" aria-label={ q.InFlightLabel + " upstream slots busy" }>
+				for _, busy := range q.Slots {
+					<span class={ "slot", templ.KV("busy", busy) }></span>
+				}
+			</span>
+			<span class="queue-num num">{ q.InFlightLabel }</span>
+		</div>
+		if q.Waiting {
+			<div class="queue-classes" role="list" aria-label="Queued requests by priority">
+				for _, c := range q.Classes {
+					<div class="qclass" role="listitem">
+						<span class={ "qtag", templ.KV("top", c.Top), templ.KV("aged", c.Aged) }>{ c.Label }</span>
+						<span class="qbar" aria-hidden="true">
+							<span class="qfill" style={ "width:" + c.Width }></span>
+						</span>
+						<span class="qcount num">{ c.CountLabel }</span>
+						<span class="qwait num faint">{ c.WaitLabel }</span>
+					</div>
+				}
+			</div>
+		} else if q.Idle {
+			<p class="queue-note faint">pool idle — nothing in flight, nothing queued</p>
+		} else {
+			<p class="queue-note faint">no queue — every request is admitted straight through</p>
+		}
+		<div class="queue-foot">
+			<span>
+				{ q.WaitingLabel }
+				if q.Waiting {
+					· oldest <b class="num">{ q.OldestLabel }</b>
+				}
+			</span>
+			if q.Aged {
+				<span class="promo-note">↑ waited past { q.PromoteLabel } — promoting ahead of priority</span>
+			}
+			<span class="faint">
+				admitted <b class="num">{ q.AdmittedLabel }</b> · promoted <b class="num">{ q.PromotedLabel }</b>
+			</span>
+		</div>
+	</div>
+}
+
 // keyRow is one selectable key in the sidebar. It is a real <button> so it is
 // keyboard-reachable and focusable; datastar drives selection and the fetch.
 templ keyRow(k KeyListItem) {
@@ -74,6 +148,9 @@ templ keyRow(k KeyListItem) {
 		<span class="row-top">
 			<span class={ "dot", k.StatusClass } aria-hidden="true"></span>
 			<span class="row-label">{ k.Label }</span>
+			if k.Elevated {
+				<span class="tag-prio" title="admission-queue rank">{ k.PrioLabel }</span>
+			}
 			if k.Revoked {
 				<span class="tag-revoked">revoked</span>
 			}
@@ -106,10 +183,11 @@ templ Detail(d DetailVM) {
 			</div>
 		</div>
 		<dl class="limits">
-			@limit("batch", d.Batch, "inputs/req")
-			@limit("rate", d.Rate, "req/min")
-			@limit("budget", d.BudgetLabel, "tokens")
-			@limit("period", d.Period, "")
+			@limit("batch", d.Batch, "inputs/req", false)
+			@limit("rate", d.Rate, "req/min", false)
+			@limit("prio", d.Prio, "in queue", d.Elevated)
+			@limit("budget", d.BudgetLabel, "tokens", false)
+			@limit("period", d.Period, "", false)
 		</dl>
 		<div class="buckets" role="group" aria-label="Token usage by period">
 			for _, b := range d.Buckets {
@@ -147,9 +225,11 @@ templ Detail(d DetailVM) {
 	</div>
 }
 
-// limit renders one key limit as a compact stat.
-templ limit(label, value, unit string) {
-	<div class="limit">
+// limit renders one key limit as a compact stat. accent marks a value worth
+// noticing at a glance (a key promoted above the free tier), so the reader's eye
+// lands on what makes this key different rather than on every stat equally.
+templ limit(label, value, unit string, accent bool) {
+	<div class={ "limit", templ.KV("accent", accent) }>
 		<dt>{ label }</dt>
 		<dd class="num">
 			{ value }
