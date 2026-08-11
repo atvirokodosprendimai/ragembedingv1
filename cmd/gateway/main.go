@@ -91,7 +91,8 @@ func run(logger *slog.Logger) error {
 	// cannot drift from the real ones.
 	contact := web.NewContact(cfg.ContactEmail, cfg.ContactPhone, cfg.CompanyURL)
 	plan := web.NewPlan(cfg.Plan.PriceEUR, cfg.Plan.VATPercent)
-	landing := web.NewLanding(cfg.EmbedModel, cfg.Defaults.BatchMax, cfg.Defaults.RatePerMin, plan, contact, logger)
+	landing := web.NewLanding(cfg.EmbedModel, cfg.Defaults.BatchMax, cfg.Defaults.RatePerMin,
+		cfg.Defaults.TokenBudget, plan, contact, logger)
 
 	// The dashboard is operator-only and is not served without a credential:
 	// it lists every key, its limits and its spend.

@@ -150,20 +150,9 @@ func articleJSONLD(vm ArticleVM) string {
 	}
 
 	// The publisher node is what ties the article to a real organisation rather
-	// than leaving it an anonymous page on an anonymous host.
-	publisher := map[string]any{
-		"@type": "Organization",
-		"name":  vm.Contact.CompanyName,
-		"url":   vm.Contact.CompanyURL,
-		"email": vm.Contact.Email,
-		"contactPoint": map[string]any{
-			"@type":             "ContactPoint",
-			"contactType":       "sales",
-			"telephone":         vm.Contact.Phone,
-			"email":             vm.Contact.Email,
-			"availableLanguage": []string{"lt", "en"},
-		},
-	}
+	// than leaving it an anonymous page on an anonymous host. It is the same
+	// node the landing page emits as the service's provider.
+	publisher := organizationJSONLD(vm.Contact)
 
 	article := map[string]any{
 		"@type":            "TechArticle",

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dustin/go-humanize"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -16,12 +17,13 @@ import (
 // touches neither the key store nor the usage store, so there is no path by
 // which it could leak who holds a key or what they spend.
 type LandingServer struct {
-	model      string
-	batchMax   int
-	ratePerMin int
-	plan       Plan
-	contact    Contact
-	logger     *slog.Logger
+	model       string
+	batchMax    int
+	ratePerMin  int
+	tokenBudget int64
+	plan        Plan
+	contact     Contact
+	logger      *slog.Logger
 }
 
 // Contact is how a reader reaches the operator. It travels as one value because
@@ -46,17 +48,18 @@ type Contact struct {
 // rather than numbers copied into prose and left to rot. The published price
 // arrives the same way and for the same reason: what the page sells and what a
 // new key is issued with are one set of numbers, read from one place.
-func NewLanding(model string, batchMax, ratePerMin int, plan Plan, contact Contact, logger *slog.Logger) *LandingServer {
+func NewLanding(model string, batchMax, ratePerMin int, tokenBudget int64, plan Plan, contact Contact, logger *slog.Logger) *LandingServer {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &LandingServer{
-		model:      model,
-		batchMax:   batchMax,
-		ratePerMin: ratePerMin,
-		plan:       plan,
-		contact:    contact,
-		logger:     logger,
+		model:       model,
+		batchMax:    batchMax,
+		ratePerMin:  ratePerMin,
+		tokenBudget: tokenBudget,
+		plan:        plan,
+		contact:     contact,
+		logger:      logger,
 	}
 }
 
@@ -89,7 +92,13 @@ type LandingVM struct {
 	BaseURL    string // the address the visitor actually reached, for copy-paste curl
 	BatchMax   string
 	RatePerMin string
-	AdminPath  string
+	// TokenBudget is what a new key may spend, already in words: "neriboti" for
+	// the unlimited default, otherwise the allowance grouped for reading. The
+	// price section sells this figure, so it is read from configuration rather
+	// than asserted in markup — a page promising unlimited tokens while the
+	// gateway issues prepaid keys is the one drift that costs money.
+	TokenBudget string
+	AdminPath   string
 	// Contact is who to ask for a key. There is no self-service signup, so
 	// without it the page tells a visitor to ask someone it cannot name.
 	Contact Contact
@@ -110,13 +119,14 @@ type StatusVM struct {
 // build assembles the page for this request.
 func (s *LandingServer) build(r *http.Request) LandingVM {
 	return LandingVM{
-		Model:      s.model,
-		BaseURL:    baseURL(r),
-		BatchMax:   strconv.Itoa(s.batchMax),
-		RatePerMin: strconv.Itoa(s.ratePerMin),
-		AdminPath:  BasePath,
-		Contact:    s.contact,
-		Plan:       s.plan,
+		Model:       s.model,
+		BaseURL:     baseURL(r),
+		BatchMax:    strconv.Itoa(s.batchMax),
+		RatePerMin:  strconv.Itoa(s.ratePerMin),
+		TokenBudget: tokenBudgetLabel(s.tokenBudget),
+		AdminPath:   BasePath,
+		Contact:     s.contact,
+		Plan:        s.plan,
 		Statuses: []StatusVM{
 			{Code: "200", Meaning: "Vektoriai grąžinti", Action: "—", Tone: "ok"},
 			{Code: "400", Meaning: "Netaisyklingas JSON arba per daug tekstų viename pakete", Action: "Pataisykite užklausą", Tone: "bad"},
@@ -127,6 +137,17 @@ func (s *LandingServer) build(r *http.Request) LandingVM {
 			{Code: "503", Meaning: "Užklausa nutraukta belaukiant eilėje", Action: "Pakartokite", Tone: "warn"},
 		},
 	}
+}
+
+// tokenBudgetLabel puts a key's token allowance into the words the price
+// section uses. -1 is the unlimited default the plan is sold on; anything
+// positive is a prepaid allowance, grouped so a nine-digit number can be read
+// at a glance rather than counted digit by digit.
+func tokenBudgetLabel(budget int64) string {
+	if budget < 0 {
+		return "neriboti"
+	}
+	return humanize.Comma(budget)
 }
 
 // baseURL reconstructs the address the visitor used, so the curl examples are
@@ -146,6 +167,27 @@ func baseURL(r *http.Request) string {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host
+}
+
+// organizationJSONLD builds the schema.org Organization node for the operator.
+// Both public pages emit it — the article as the publisher of the text, the
+// landing page as the provider of the service — and they must describe the same
+// organisation to the same crawler, so the node is built once here rather than
+// written out twice and left to diverge.
+func organizationJSONLD(c Contact) map[string]any {
+	return map[string]any{
+		"@type": "Organization",
+		"name":  c.CompanyName,
+		"url":   c.CompanyURL,
+		"email": c.Email,
+		"contactPoint": map[string]any{
+			"@type":             "ContactPoint",
+			"contactType":       "sales",
+			"telephone":         c.Phone,
+			"email":             c.Email,
+			"availableLanguage": []string{"lt", "en"},
+		},
+	}
 }
 
 // NewContact assembles the published contact details. The phone is stored twice
