@@ -213,7 +213,9 @@ Copy `.env.example` to `.env`. Real environment variables override `.env`.
 | `DB_PATH` | `ragembed.db` | SQLite file (keys + usage) |
 | `CADDY_UPSTREAM_URL` | `http://localhost:11435` | The Caddy load balancer |
 | `EMBED_MODEL` | `bge-m3` | Model name recorded with usage |
-| `CONTACT_EMAIL` | `info@ituoga.lt` | Address published on the landing page for key requests |
+| `CONTACT_EMAIL` | `info@ituoga.lt` | Address published on the public pages for key requests |
+| `CONTACT_PHONE` | `+37063594444` | Phone published alongside it (becomes a `tel:` link) |
+| `COMPANY_URL` | `https://letas.lt` | Operator's site; linked publicly and named as the article's publisher |
 | `DEFAULT_BATCH_MAX` | `25` | Default inputs/request per key |
 | `DEFAULT_RATE_PER_MIN` | `400` | Default requests/min per key |
 | `DEFAULT_TOKEN_BUDGET` | `-1` | Default token budget (`-1` = unlimited) |

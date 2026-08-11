@@ -88,7 +88,8 @@ func run(logger *slog.Logger) error {
 
 	// Public API documentation. It is built from the same config the gateway
 	// enforces, so the limits it advertises cannot drift from the real ones.
-	landing := web.NewLanding(cfg.EmbedModel, cfg.Defaults.BatchMax, cfg.Defaults.RatePerMin, cfg.ContactEmail, logger)
+	contact := web.NewContact(cfg.ContactEmail, cfg.ContactPhone, cfg.CompanyURL)
+	landing := web.NewLanding(cfg.EmbedModel, cfg.Defaults.BatchMax, cfg.Defaults.RatePerMin, contact, logger)
 
 	// The dashboard is operator-only and is not served without a credential:
 	// it lists every key, its limits and its spend.

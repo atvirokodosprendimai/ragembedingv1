@@ -493,3 +493,12 @@ article a:not(.mailto):not(.admin-link) {
 	border-top: 1px solid var(--line);
 	padding-top: 26px;
 }
+
+/* Email and phone sit side by side on a wide screen and stack on a narrow one,
+   so neither is buried and both keep a full-size touch target. */
+.contact-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	max-width: none;
+}

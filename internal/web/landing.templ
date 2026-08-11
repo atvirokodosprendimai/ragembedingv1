@@ -171,12 +171,7 @@ print(len(vektoriai.data), "vektoriai")`)
 							mums ir trumpai nurodykite, kiek maždaug tekstų planuojate apdoroti,
 							kad paketo, dažnio ir biudžeto limitai būtų nustatyti prasmingai.
 						</p>
-						<p>
-							<a class="mailto" href={ templ.SafeURL("mailto:" + vm.ContactEmail + "?subject=ragembed%20API%20raktas") }>
-								<span class="tick" aria-hidden="true">✉</span>
-								{ vm.ContactEmail }
-							</a>
-						</p>
+						@contactLinks(vm.Contact)
 						<p class="note">
 							Raktą laikykite paslaptyje: saugoma tik jo maiša (hash), todėl pamesto
 							rakto atkurti neįmanoma — tik išduoti naują.
@@ -198,12 +193,31 @@ print(len(vektoriai.data), "vektoriai")`)
 					</section>
 				</main>
 				<footer class="foot">
-					<span>{ vm.Model } embeddingai · tokenai skaičiuojami pagal paties modelio ataskaitą</span>
+					<span>
+						{ vm.Model } embeddingai ·
+						<a class="admin-link" href={ templ.SafeURL(vm.Contact.CompanyURL) }>{ vm.Contact.CompanyName }</a>
+					</span>
 					<a class="admin-link" href={ templ.SafeURL(vm.AdminPath) }>operatoriaus skydelis →</a>
 				</footer>
 			</div>
 		</body>
 	</html>
+}
+
+// contactLinks renders the ways to reach a human. Email and phone sit together
+// because people differ in which one they will actually use, and both are real
+// links: a tel: on a phone dials, and on a desktop it is still readable.
+templ contactLinks(c Contact) {
+	<p class="contact-row">
+		<a class="mailto" href={ templ.SafeURL("mailto:" + c.Email + "?subject=ragembed%20API%20raktas") }>
+			<span class="tick" aria-hidden="true">✉</span>
+			{ c.Email }
+		</a>
+		<a class="mailto" href={ templ.SafeURL("tel:" + c.Phone) }>
+			<span class="tick" aria-hidden="true">☎</span>
+			{ c.PhoneLabel }
+		</a>
+	</p>
 }
 
 // code renders one copy-pasteable block. The <pre> scrolls on its own so a long

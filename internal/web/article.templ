@@ -251,17 +251,15 @@ templ Article(vm ArticleVM) {
 								patikrinti, ar paieška randa tai, ko žmonės iš tikrųjų klausia. Tam
 								užtenka rakto ir kelių valandų.
 							</p>
-							<p>
-								<a class="mailto" href={ templ.SafeURL("mailto:" + vm.ContactEmail + "?subject=ragembed%20API%20raktas") }>
-									<span class="tick" aria-hidden="true">✉</span>
-									{ vm.ContactEmail }
-								</a>
-							</p>
+							@contactLinks(vm.Contact)
 						</section>
 					</article>
 				</main>
 				<footer class="foot">
-					<span>{ vm.Model } embeddingai · tekstai lieka jūsų infrastruktūroje</span>
+					<span>
+						{ vm.Model } embeddingai ·
+						<a class="admin-link" href={ templ.SafeURL(vm.Contact.CompanyURL) }>{ vm.Contact.CompanyName }</a>
+					</span>
 					<a class="admin-link" href="/">← techninė dokumentacija</a>
 				</footer>
 			</div>
