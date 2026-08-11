@@ -139,23 +139,34 @@ func skipRest(dec *json.Decoder, open json.Delim) error {
 	return nil
 }
 
-// upstreamUsage mirrors the usage block of Ollama's OpenAI-compatible embeddings
-// response. prompt_tokens is the authoritative bge-m3 input-token count.
+// upstreamUsage mirrors however the upstream reports input tokens. The two
+// embedding APIs name the same number differently:
+//
+//	/v1/embeddings (OpenAI-compatible) -> {"usage":{"prompt_tokens":7}}
+//	/api/embed     (Ollama native)     -> {"prompt_eval_count":7}
+//
+// Both are the authoritative bge-m3 input-token count for the request, so both
+// are decoded and billed identically.
 type upstreamUsage struct {
 	Usage struct {
 		PromptTokens int64 `json:"prompt_tokens"`
 	} `json:"usage"`
+	PromptEvalCount int64 `json:"prompt_eval_count"`
 }
 
-// parsePromptTokens pulls prompt_tokens out of an upstream response body. A body
-// that lacks the field (or isn't the JSON we expect) yields 0 rather than an
-// error: usage accounting is best-effort and must never fail a client's request.
+// parsePromptTokens pulls the input-token count out of an upstream response
+// body, accepting either API's spelling. A body that lacks both fields (or isn't
+// the JSON we expect) yields 0 rather than an error: usage accounting is
+// best-effort and must never fail a client's request.
 func parsePromptTokens(body []byte) int64 {
 	var u upstreamUsage
 	if err := json.Unmarshal(body, &u); err != nil {
 		return 0
 	}
-	return u.Usage.PromptTokens
+	if u.Usage.PromptTokens > 0 {
+		return u.Usage.PromptTokens
+	}
+	return u.PromptEvalCount
 }
 
 // apiError is the OpenAI-style error envelope. Emitting this shape means existing

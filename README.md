@@ -1,10 +1,10 @@
 # ragembedingv1
 
 An authenticating, rate-limiting, usage-metering proxy in front of an Ollama
-embeddings pool. Clients speak the OpenAI `/v1/embeddings` API with a per-token
-API key; the gateway enforces per-key limits, forwards accepted requests to a
-Caddy load balancer that fans out across 10 Ollama backends, and records the
-`bge-m3` token usage Ollama reports.
+embeddings pool. Clients speak either the OpenAI `/v1/embeddings` API or Ollama's
+native `/api/embed`, with a per-token API key; the gateway enforces per-key
+limits, forwards accepted requests to a Caddy load balancer that fans out across
+10 Ollama backends, and records the `bge-m3` token usage Ollama reports.
 
 ```
 client ──Bearer sk-rag-…──▶ gateway ──▶ Caddy (:11435) ──▶ ollama-1 … ollama-10
@@ -14,10 +14,18 @@ client ──Bearer sk-rag-…──▶ gateway ──▶ Caddy (:11435) ──�
 
 ## What it does
 
+- **Two endpoints, one pipeline** — `POST /v1/embeddings` (OpenAI-compatible,
+  for SDK clients) and `POST /api/embed` (Ollama native). Both take the same
+  polymorphic `input` (a string, or an array for a batch) and go through the
+  same auth, batch, rate, budget, queue and accounting path. They differ only in
+  how the upstream reports tokens — `usage.prompt_tokens` vs
+  `prompt_eval_count` — and both are billed identically. Note the old
+  single-prompt `/api/embeddings` (plural) is **not** proxied: it takes one
+  `prompt`, not a batch.
 - **Per-token API keys** — SQLite-backed (pure Go, **no cgo**), only the SHA-256
   hash is stored. Keys are issued from the CLI, never self-service.
-- **Batch limit** — rejects an `/v1/embeddings` request whose `input` array
-  exceeds the key's `batch_max` (default 25) with `400`.
+- **Batch limit** — rejects a request whose `input` array exceeds the key's
+  `batch_max` (default 25) with `400`.
 - **Rate limit** — per-key requests/minute (default 400). Over the limit returns
   `429` with a `Retry-After` header telling the client exactly how long to wait.
 - **Token budget** — each key has a budget of `bge-m3` input tokens:
@@ -65,6 +73,27 @@ ragctl create --name main-site --priority 9   # front-of-house
 ragctl create --name nightly-batch            # priority 0, the default
 ragctl priority --id 3 --priority 9           # promote a key already deployed
 ```
+
+## Dashboard access
+
+The dashboard is operator-only — it lists every key, its limits and its spend —
+so it sits behind HTTP Basic auth and **fails closed**: with no
+`DASHBOARD_PASSWORD` set it is not served at all (`404`), and the embeddings API
+carries on regardless. The whole surface is guarded (`/`, `/keys/{id}`, `/queue`
+and the assets); only `/healthz` stays public, so load balancers still work.
+
+```bash
+DASHBOARD_USER=admin DASHBOARD_PASSWORD='…' go run ./cmd/gateway
+```
+
+Two caveats worth knowing:
+
+- **Basic auth needs TLS.** The credential is base64-encoded on every request,
+  not encrypted. If the gateway is reachable from anywhere but localhost, put a
+  TLS terminator in front of it.
+- **It is one shared credential**, not user accounts — rotate it by changing the
+  env var and restarting. Client authentication is separate and unchanged: API
+  keys, `Authorization: Bearer sk-rag-…`.
 
 ## Status-code contract
 
@@ -114,6 +143,8 @@ Copy `.env.example` to `.env`. Real environment variables override `.env`.
 | `DEFAULT_TOKEN_BUDGET` | `-1` | Default token budget (`-1` = unlimited) |
 | `DEFAULT_BUDGET_PERIOD` | `lifetime` | Default period (`monthly`/`lifetime`) |
 | `DEFAULT_PRIORITY` | `0` | Default queue rank for a new key (`0`–`9`) |
+| `DASHBOARD_USER` | `admin` | Dashboard Basic-auth username |
+| `DASHBOARD_PASSWORD` | *(empty)* | Dashboard Basic-auth password; **empty disables the dashboard** |
 | `UPSTREAM_MAX_CONCURRENT` | `10` | Concurrent upstream slots (one per Ollama backend) |
 | `QUEUE_PROMOTE_AFTER` | `5s` | Wait after which a queued request is promoted |
 
@@ -132,6 +163,12 @@ go run ./cmd/ragctl create --name batch --budget 100000000 --period monthly --ba
 
 # 4. Use it exactly like the OpenAI embeddings API:
 curl http://localhost:8080/v1/embeddings \
+  -H "Authorization: Bearer sk-rag-…" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"bge-m3","input":["hello","world"]}'
+
+# …or Ollama's native batch endpoint, same key, same limits:
+curl http://localhost:8080/api/embed \
   -H "Authorization: Bearer sk-rag-…" \
   -H "Content-Type: application/json" \
   -d '{"model":"bge-m3","input":["hello","world"]}'

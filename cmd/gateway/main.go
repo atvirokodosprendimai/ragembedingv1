@@ -69,11 +69,21 @@ func run(logger *slog.Logger) error {
 	// it can show live pool pressure.
 	dashboard := web.NewServer(keyRepo, usageRepo, pool, cfg.EmbedModel, time.Now, logger)
 
+	// The dashboard is operator-only and is not served without a credential:
+	// it lists every key, its limits and its spend.
+	var dashboardAuth func(http.Handler) http.Handler
+	if cfg.Dashboard.Enabled() {
+		dashboardAuth = httpapi.BasicAuth(cfg.Dashboard.User, cfg.Dashboard.Password, logger)
+	} else {
+		logger.Warn("dashboard disabled: set DASHBOARD_PASSWORD to serve it (the embeddings API is unaffected)")
+	}
+
 	router := httpapi.Router{
-		Keys:       keyRepo,
-		Embeddings: embeddings,
-		Dashboard:  dashboard.Handler(),
-		Logger:     logger,
+		Keys:          keyRepo,
+		Embeddings:    embeddings,
+		Dashboard:     dashboard.Handler(),
+		DashboardAuth: dashboardAuth,
+		Logger:        logger,
 	}
 
 	srv := &http.Server{

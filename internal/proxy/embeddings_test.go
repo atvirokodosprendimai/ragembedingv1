@@ -75,3 +75,25 @@ func TestParsePromptTokens(t *testing.T) {
 	require.Equal(t, int64(0), parsePromptTokens([]byte(`{"data":[]}`)))     // missing usage
 	require.Equal(t, int64(0), parsePromptTokens([]byte(`not json at all`))) // best-effort
 }
+
+// TestParsePromptTokensAcceptsBothAPIs: the OpenAI-compatible route reports
+// usage.prompt_tokens and Ollama's native /api/embed reports prompt_eval_count.
+// Both are the same bge-m3 input-token count, so both must bill identically —
+// otherwise native-API traffic would be served for free.
+func TestParsePromptTokensAcceptsBothAPIs(t *testing.T) {
+	cases := map[string]struct {
+		body string
+		want int64
+	}{
+		"openai usage block": {`{"object":"list","data":[],"usage":{"prompt_tokens":7,"total_tokens":7}}`, 7},
+		"native prompt_eval": {`{"model":"bge-m3","embeddings":[[0.1]],"prompt_eval_count":7}`, 7},
+		"neither field":      {`{"model":"bge-m3","embeddings":[[0.1]]}`, 0},
+		"not json":           {`<html>502 bad gateway</html>`, 0},
+		"zero tokens":        {`{"usage":{"prompt_tokens":0}}`, 0},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, c.want, parsePromptTokens([]byte(c.body)))
+		})
+	}
+}

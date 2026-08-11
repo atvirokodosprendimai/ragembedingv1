@@ -1,10 +1,12 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -44,6 +46,21 @@ type Defaults struct {
 	Priority int
 }
 
+// Dashboard is the operator dashboard's access control. The dashboard lists
+// every key, its limits and its spend, so it is operator-only: with no password
+// configured the gateway refuses to serve it at all rather than exposing it.
+type Dashboard struct {
+	// User is the Basic-auth username.
+	User string
+	// Password is the Basic-auth password. Empty means "no credentials
+	// configured", which disables the dashboard. The embeddings API is
+	// unaffected either way.
+	Password string
+}
+
+// Enabled reports whether the dashboard has credentials and may be served.
+func (d Dashboard) Enabled() bool { return d.Password != "" }
+
 // Queue configures the admission queue that fronts the Ollama pool. Its job is
 // to keep the operator's own site off the back of a batch client's flood, so the
 // two knobs are "how much work the pool can take at once" and "how long anyone
@@ -76,6 +93,8 @@ type Config struct {
 	Defaults Defaults
 	// Queue is the upstream admission queue's configuration.
 	Queue Queue
+	// Dashboard guards the operator UI.
+	Dashboard Dashboard
 }
 
 // Load resolves configuration from the process environment, first sourcing a
@@ -109,6 +128,12 @@ func Load() (Config, error) {
 			// One slot per Ollama backend in the reference topology.
 			MaxConcurrent: envInt("UPSTREAM_MAX_CONCURRENT", 10),
 			PromoteAfter:  envDuration("QUEUE_PROMOTE_AFTER", 5*time.Second),
+		},
+		Dashboard: Dashboard{
+			User: envStr("DASHBOARD_USER", "admin"),
+			// No default: an operator UI must never be reachable because someone
+			// forgot to set a password.
+			Password: os.Getenv("DASHBOARD_PASSWORD"),
 		},
 	}
 
@@ -148,6 +173,11 @@ func (c Config) validate() error {
 	}
 	if c.Queue.PromoteAfter <= 0 {
 		return fmt.Errorf("config: QUEUE_PROMOTE_AFTER must be > 0, got %s", c.Queue.PromoteAfter)
+	}
+	// An unset DASHBOARD_USER falls back to "admin", but a blank one ("  ") would
+	// stick: half a credential is a misconfiguration, not a weaker setting.
+	if c.Dashboard.Enabled() && strings.TrimSpace(c.Dashboard.User) == "" {
+		return errors.New("config: DASHBOARD_USER must not be blank when DASHBOARD_PASSWORD is set")
 	}
 	u, err := url.Parse(c.CaddyUpstreamURL)
 	if err != nil || u.Scheme == "" || u.Host == "" {
