@@ -62,10 +62,53 @@ type Queue struct {
 	// queue exists to prevent.
 	justPromoted bool
 
+	// watchers are notified whenever the queue's state changes, so a dashboard
+	// can repaint on the event rather than guessing an interval.
+	watchers map[chan struct{}]struct{}
+
 	// Lifetime counters, surfaced through Stats for the dashboard.
 	admitted  uint64
 	promoted  uint64
 	cancelled uint64
+}
+
+// Watch returns a channel that receives a signal whenever the queue changes —
+// a request admitted, queued, granted, released or cancelled — plus the func
+// that stops watching.
+//
+// The channel is a bare signal, not a state: it is buffered by one and written
+// to without blocking, so a watcher that is busy rendering simply coalesces the
+// changes it missed into the next wake-up. That is the right semantics for a
+// live display and, more importantly, it means no watcher can ever slow down the
+// request path that feeds it.
+func (q *Queue) Watch() (<-chan struct{}, func()) {
+	ch := make(chan struct{}, 1)
+
+	q.mu.Lock()
+	q.watchers[ch] = struct{}{}
+	q.mu.Unlock()
+
+	var once sync.Once
+	return ch, func() {
+		once.Do(func() {
+			q.mu.Lock()
+			delete(q.watchers, ch)
+			q.mu.Unlock()
+		})
+	}
+}
+
+// notifyLocked signals every watcher. The caller must hold q.mu; the sends never
+// block, so holding the lock across them is safe.
+func (q *Queue) notifyLocked() {
+	for ch := range q.watchers {
+		select {
+		case ch <- struct{}{}:
+		default:
+			// Already signalled and not yet read: the pending wake-up covers
+			// this change too.
+		}
+	}
 }
 
 // New returns a Queue admitting at most capacity concurrent requests and
@@ -91,6 +134,7 @@ func NewWithClock(capacity int, promoteAfter time.Duration, clock func() time.Ti
 		promoteAfter: promoteAfter,
 		clock:        clock,
 		classes:      make(map[int]*list.List),
+		watchers:     make(map[chan struct{}]struct{}),
 	}
 }
 
@@ -106,12 +150,14 @@ func (q *Queue) Acquire(ctx context.Context, priority int) (Release, error) {
 	if q.free > 0 && q.waiting == 0 {
 		q.free--
 		q.admitted++
+		q.notifyLocked()
 		q.mu.Unlock()
 		return q.releaser(), nil
 	}
 
 	w := &waiter{priority: priority, since: q.clock(), ready: make(chan struct{})}
 	q.pushLocked(w)
+	q.notifyLocked()
 	q.mu.Unlock()
 
 	select {
@@ -137,6 +183,7 @@ func (q *Queue) Acquire(ctx context.Context, priority int) (Release, error) {
 		}
 		q.removeLocked(w)
 		q.cancelled++
+		q.notifyLocked()
 		return nil, ctx.Err()
 	}
 }
@@ -158,6 +205,7 @@ func (q *Queue) releaser() Release {
 // releaseLocked gives one slot back, handing it directly to the next waiter when
 // there is one. The caller must hold q.mu.
 func (q *Queue) releaseLocked() {
+	defer q.notifyLocked()
 	if w, promoted := q.popLocked(q.clock()); w != nil {
 		w.granted = true
 		w.promoted = promoted

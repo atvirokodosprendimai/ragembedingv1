@@ -104,16 +104,29 @@ server decides what to push and how often:
 for {
     select {
     case <-r.Context().Done(): return          // tab closed → unsubscribe → actor retires
-    case <-ticker.C:          push(queue)      // pool pressure, server's cadence
+    case <-changes:           push(queue)      // the queue moved: admitted, queued, released
+    case <-cooldown.C:        push(queue)      // …coalesced to at most one frame per 100ms
+    case <-heartbeat.C:       push(queue)      // 1s, so "oldest 3.2s" keeps counting
     case snap := <-snapshots: push(detail, row, total)   // the instant usage is recorded
     }
 }
 ```
 
-There is no polling and no client-side state. Measured against a real Ollama, a
-recorded call reaches the screen **~2 ms after the write** — the previous polling
-dashboard showed it up to 30 s later, and paid a query per viewer per tick to be
-that stale.
+Nothing here is sampled. Both halves are event-driven — the queue signals every
+admission, enqueue, grant, release and cancel; the key's actor signals every
+recorded call — and the only timers are a 100 ms floor (so a burst of hundreds of
+queue changes a second becomes one legible frame rather than hundreds) and a 1 s
+heartbeat (so elapsed figures keep ticking while nothing changes).
+
+Watchers can never slow the request path down: every signal is a non-blocking
+send to a one-deep channel, so a watcher that is mid-render just coalesces what
+it missed into its next wake-up.
+
+Measured against a real Ollama in a browser: a recorded call reaches the screen
+**~2 ms after the write**, and a request that queues shows up at **"6 queued ·
+oldest 100ms"**. The previous polling dashboard showed usage up to 30 s late and
+pool pressure up to 5 s late, and paid a query per viewer per tick to be that
+stale.
 
 One caveat: the sidebar figures for *other* keys are a page-load snapshot. Only
 the key you are watching streams, which is the point of an actor per key.

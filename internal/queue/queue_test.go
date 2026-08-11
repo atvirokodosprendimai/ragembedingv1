@@ -369,3 +369,89 @@ func TestPromotionsAlternateUnderSustainedPressure(t *testing.T) {
 	}
 	require.Equal(t, []int{0, 9, 0, 9, 0, 9}, got)
 }
+
+// TestWatchSignalsOnEveryStateChange: the dashboard repaints on the event, so a
+// request queuing up or a slot freeing has to wake a watcher.
+func TestWatchSignalsOnEveryStateChange(t *testing.T) {
+	q := New(1, DefaultPromoteAfter)
+	changes, unwatch := q.Watch()
+	defer unwatch()
+
+	drain := func() {
+		for {
+			select {
+			case <-changes:
+			default:
+				return
+			}
+		}
+	}
+	signalled := func(what string) {
+		t.Helper()
+		select {
+		case <-changes:
+		case <-time.After(time.Second):
+			t.Fatalf("no signal after %s", what)
+		}
+	}
+
+	hold, err := q.Acquire(context.Background(), 0)
+	require.NoError(t, err)
+	signalled("an admission")
+
+	drain()
+	admitted := make(chan int, 1)
+	enqueue(t, q, 0, admitted) // queues behind the held slot
+	waitForWaiting(t, q, 1)
+	signalled("a request queuing")
+
+	drain()
+	hold() // hands the slot to the waiter
+	require.Equal(t, 0, <-admitted)
+	signalled("a slot being handed on")
+}
+
+func TestUnwatchStopsSignals(t *testing.T) {
+	q := New(2, DefaultPromoteAfter)
+	changes, unwatch := q.Watch()
+
+	unwatch()
+	unwatch() // idempotent: handlers defer it
+
+	release, err := q.Acquire(context.Background(), 0)
+	require.NoError(t, err)
+	release()
+
+	select {
+	case <-changes:
+		t.Fatal("a detached watcher must not be signalled")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+// TestWatcherThatNeverReadsCannotBlockTheQueue is the property that matters
+// most: the dashboard is fed by the request path, and must never be able to slow
+// it down. A watcher that never reads its channel simply misses signals.
+func TestWatcherThatNeverReadsCannotBlockTheQueue(t *testing.T) {
+	q := New(4, DefaultPromoteAfter)
+	_, unwatch := q.Watch() // deliberately never read
+	defer unwatch()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range 500 {
+			release, err := q.Acquire(context.Background(), 0)
+			if err != nil {
+				return
+			}
+			release()
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("an unread watcher blocked the request path")
+	}
+}
