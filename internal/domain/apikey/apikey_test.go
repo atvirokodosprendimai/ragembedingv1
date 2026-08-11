@@ -117,3 +117,19 @@ func TestGenerateAndHashKey(t *testing.T) {
 	require.NotContains(t, HashKey(k1), k1, "hash must not embed the plaintext")
 	require.Len(t, HashKey(k1), 64) // hex-encoded SHA-256
 }
+
+func TestValidPriority(t *testing.T) {
+	cases := []struct {
+		p    int
+		want bool
+	}{
+		{p: NormalPriority, want: true}, // the default every key is issued with
+		{p: 5, want: true},              // an intermediate tier
+		{p: MaxPriority, want: true},    // the main site's rank
+		{p: MaxPriority + 1, want: false},
+		{p: -1, want: false}, // negative ranks would sort below the default
+	}
+	for _, c := range cases {
+		require.Equalf(t, c.want, ValidPriority(c.p), "ValidPriority(%d)", c.p)
+	}
+}

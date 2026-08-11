@@ -42,6 +42,26 @@ func (p BudgetPeriod) Valid() bool {
 // allowed negative.
 const Unlimited int64 = -1
 
+// Priority ranks a key's traffic in the upstream admission queue: when the
+// Ollama pool is saturated, higher-priority requests are admitted first. It is
+// a scheduling rank, not an entitlement — every key keeps the same batch, rate
+// and budget limits, and a low-priority request is never dropped for a
+// high-priority one, only served after it (and promoted once it has waited too
+// long).
+const (
+	// NormalPriority is the default rank every key is issued with: free,
+	// best-effort access to whatever capacity the pool has spare.
+	NormalPriority = 0
+	// MaxPriority is the top rank, reserved for the operator's own front-of-house
+	// traffic (the main site) so its users never queue behind batch jobs.
+	MaxPriority = 9
+)
+
+// ValidPriority reports whether p is an assignable priority rank. The ceiling
+// exists so the queue's per-class bookkeeping stays a handful of classes rather
+// than one per arbitrary integer an operator types.
+func ValidPriority(p int) bool { return p >= NormalPriority && p <= MaxPriority }
+
 // APIKey is a credential a client presents plus the limits that govern it. It
 // doubles as the GORM model; only the key hash is ever stored, never the
 // plaintext. The pure methods below carry the business rules and touch neither
@@ -55,6 +75,9 @@ type APIKey struct {
 	// TokenBudget caps bge-m3 input tokens; Unlimited (-1) means no cap.
 	TokenBudget  int64        `gorm:"column:token_budget"`
 	BudgetPeriod BudgetPeriod `gorm:"column:budget_period"`
+	// Priority is the key's rank in the upstream admission queue (see
+	// NormalPriority / MaxPriority). Higher is served first when the pool is busy.
+	Priority int `gorm:"column:priority"`
 	// RevokedAt is nil for an active key and set once revoked; a revoked key is
 	// rejected at auth regardless of its limits.
 	RevokedAt *time.Time `gorm:"column:revoked_at"`
@@ -152,6 +175,10 @@ type Repository interface {
 	ByID(ctx context.Context, id uint) (*APIKey, error)
 	// List returns all keys, newest first, for the operator CLI and dashboard.
 	List(ctx context.Context) ([]APIKey, error)
+	// SetPriority re-ranks a key in the admission queue. It exists so an
+	// operator can promote an already-issued key (the main site's) without
+	// minting a replacement and re-deploying it.
+	SetPriority(ctx context.Context, id uint, priority int) error
 	// Revoke marks the key revoked; subsequent auth attempts fail.
 	Revoke(ctx context.Context, id uint) error
 }

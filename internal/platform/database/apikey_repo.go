@@ -68,6 +68,21 @@ func (r *APIKeyRepo) List(ctx context.Context) ([]apikey.APIKey, error) {
 	return keys, nil
 }
 
+// SetPriority re-ranks a key in the admission queue. The caller validates the
+// rank (apikey.ValidPriority); this is a plain column write so an operator can
+// promote a live key without reissuing it. An unknown id is a no-op, matching
+// Revoke's idempotent shape.
+func (r *APIKeyRepo) SetPriority(ctx context.Context, id uint, priority int) error {
+	err := r.db.WithContext(ctx).
+		Model(&apikey.APIKey{}).
+		Where("id = ?", id).
+		Update("priority", priority).Error
+	if err != nil {
+		return fmt.Errorf("apikey repo: set priority: %w", err)
+	}
+	return nil
+}
+
 // Revoke stamps revoked_at on the key so subsequent auth attempts fail. Revoking
 // an already-revoked or unknown id is a no-op rather than an error, keeping the
 // operation idempotent.

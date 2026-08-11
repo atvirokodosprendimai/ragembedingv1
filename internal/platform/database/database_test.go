@@ -84,6 +84,39 @@ func TestAPIKeyRepoRoundTrip(t *testing.T) {
 	require.True(t, revoked.IsRevoked())
 }
 
+// TestAPIKeyRepoSetPriority covers promoting an already-issued key, which is how
+// an operator ranks the main site's existing credential without reissuing it.
+func TestAPIKeyRepoSetPriority(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewAPIKeyRepo(db)
+	ctx := context.Background()
+
+	plaintext, err := apikey.GenerateKey()
+	require.NoError(t, err)
+	k := &apikey.APIKey{
+		Name:         "main-site",
+		KeyHash:      apikey.HashKey(plaintext),
+		BatchMax:     25,
+		RatePerMin:   400,
+		TokenBudget:  apikey.Unlimited,
+		BudgetPeriod: apikey.Lifetime,
+	}
+	require.NoError(t, repo.Create(ctx, k))
+
+	// A key issued without an explicit rank lands on the free tier.
+	stored, err := repo.ByID(ctx, k.ID)
+	require.NoError(t, err)
+	require.Equal(t, apikey.NormalPriority, stored.Priority)
+
+	require.NoError(t, repo.SetPriority(ctx, k.ID, apikey.MaxPriority))
+	promoted, err := repo.ByHash(ctx, apikey.HashKey(plaintext))
+	require.NoError(t, err)
+	require.Equal(t, apikey.MaxPriority, promoted.Priority)
+
+	// Unknown ids are a no-op, like Revoke.
+	require.NoError(t, repo.SetPriority(ctx, 4242, apikey.MaxPriority))
+}
+
 // TestUsageRepoSumTokens exercises the time-bucketed accounting the dashboard
 // relies on. Events are stamped at fixed times and summed over the reporting
 // windows for a fixed "now".
