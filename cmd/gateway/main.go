@@ -18,6 +18,7 @@ import (
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/httpapi"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/platform/database"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/proxy"
+	"github.com/atvirokodosprendimai/ragembedingv1/internal/queue"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/ratelimit"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/web"
 )
@@ -58,7 +59,11 @@ func run(logger *slog.Logger) error {
 	limiter := ratelimit.New()
 	budgetChecker := budget.NewChecker(usageRepo, time.Now)
 	forwarder := proxy.NewHTTPForwarder(cfg.CaddyUpstreamURL, upstreamTimeout)
-	embeddings := proxy.NewHandler(budgetChecker, limiter, usageRepo, forwarder, cfg.EmbedModel, time.Now, logger)
+	// One admission queue for the whole process: it is the only thing that knows
+	// how much of the Ollama pool is in use, so it must be shared by every
+	// request rather than created per handler.
+	pool := queue.New(cfg.Queue.MaxConcurrent, cfg.Queue.PromoteAfter)
+	embeddings := proxy.NewHandler(budgetChecker, limiter, usageRepo, forwarder, pool, cfg.EmbedModel, time.Now, logger)
 
 	// Operator dashboard over the same DB.
 	dashboard := web.NewServer(keyRepo, usageRepo, cfg.EmbedModel, time.Now, logger)
@@ -88,7 +93,8 @@ func run(logger *slog.Logger) error {
 	serveErr := make(chan error, 1)
 	go func() {
 		logger.Info("gateway listening",
-			"addr", cfg.ListenAddr, "upstream", cfg.CaddyUpstreamURL, "model", cfg.EmbedModel)
+			"addr", cfg.ListenAddr, "upstream", cfg.CaddyUpstreamURL, "model", cfg.EmbedModel,
+			"pool_slots", cfg.Queue.MaxConcurrent, "promote_after", cfg.Queue.PromoteAfter)
 		serveErr <- srv.ListenAndServe()
 	}()
 

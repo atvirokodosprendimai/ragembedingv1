@@ -13,6 +13,7 @@ import (
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/budget"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/domain/apikey"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/domain/usage"
+	"github.com/atvirokodosprendimai/ragembedingv1/internal/queue"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/ratelimit"
 )
 
@@ -39,6 +40,13 @@ type usageRecorder interface {
 	Record(ctx context.Context, e *usage.Event) error
 }
 
+// admitter gates access to the shared Ollama pool: it hands out one of a fixed
+// number of concurrent slots, highest priority first, and returns the func that
+// gives the slot back.
+type admitter interface {
+	Acquire(ctx context.Context, priority int) (queue.Release, error)
+}
+
 // Handler serves POST /v1/embeddings. It is the enforcement point: it runs the
 // cheap, local checks before spending an upstream call, forwards accepted
 // requests to Caddy, and records the bge-m3 tokens Ollama reports.
@@ -47,19 +55,22 @@ type Handler struct {
 	limiter   rateLimiter
 	usage     usageRecorder
 	forwarder Forwarder
+	pool      admitter
 	model     string
 	maxBody   int64
 	now       func() time.Time
 	logger    *slog.Logger
 }
 
-// NewHandler wires the enforcement pipeline. model is recorded with usage (bge-m3);
+// NewHandler wires the enforcement pipeline. pool admits the request to the
+// shared Ollama pool in priority order; model is recorded with usage (bge-m3);
 // now is injectable for deterministic tests; logger may be nil (defaults to slog).
 func NewHandler(
 	bc budgetChecker,
 	rl rateLimiter,
 	ur usageRecorder,
 	fw Forwarder,
+	pool admitter,
 	model string,
 	now func() time.Time,
 	logger *slog.Logger,
@@ -75,6 +86,7 @@ func NewHandler(
 		limiter:   rl,
 		usage:     ur,
 		forwarder: fw,
+		pool:      pool,
 		model:     model,
 		maxBody:   defaultMaxBodyBytes,
 		now:       now,
@@ -147,8 +159,31 @@ func (h *Handler) Embeddings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Admission. Every check above is local and costs nothing to shed, so the
+	// request only competes for a slot in the Ollama pool once it is known to be
+	// legitimate and paid for. The queue serves higher-priority keys first — the
+	// operator's own site does not wait behind a batch client's flood — while
+	// promoting anyone who has waited too long, so free traffic still drains.
+	release, err := h.pool.Acquire(r.Context(), key.Priority)
+	if err != nil {
+		// Only context cancellation lands here: the client hung up or the gateway
+		// is shutting down while this request was queued. No slot is held.
+		h.logger.Info("queued request abandoned", "key_id", key.ID, "priority", key.Priority, "err", err)
+		WriteError(w, http.StatusServiceUnavailable, "service_unavailable",
+			"request cancelled while queued for the embedding pool")
+		return
+	}
+	// Belt-and-braces: the explicit release below frees the slot as soon as the
+	// upstream call returns, and this defer covers the panic path. Release is
+	// idempotent, so calling it twice is harmless.
+	defer release()
+
 	// Forward the original body verbatim so no client field is lost or reshaped.
 	up, err := h.forwarder.Forward(r.Context(), r.URL.Path, body)
+	// The slot covers the upstream call only: accounting and relaying are local
+	// work, and holding a slot through a slow client's download would idle an
+	// Ollama backend that someone else is queued for.
+	release()
 	if err != nil {
 		h.logger.Error("upstream forward failed", "key_id", key.ID, "err", err)
 		WriteError(w, http.StatusBadGateway, "upstream_error", "embedding backend unavailable")
