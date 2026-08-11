@@ -84,9 +84,9 @@ func TestAPIKeyRepoRoundTrip(t *testing.T) {
 	require.True(t, revoked.IsRevoked())
 }
 
-// TestAPIKeyRepoSetPriority covers promoting an already-issued key, which is how
-// an operator ranks the main site's existing credential without reissuing it.
-func TestAPIKeyRepoSetPriority(t *testing.T) {
+// TestAPIKeyRepoUpdateLimits covers retuning an already-issued key, which is how
+// an operator raises a cap or promotes a credential without reissuing it.
+func TestAPIKeyRepoUpdateLimits(t *testing.T) {
 	db := newTestDB(t)
 	repo := NewAPIKeyRepo(db)
 	ctx := context.Background()
@@ -108,13 +108,28 @@ func TestAPIKeyRepoSetPriority(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, apikey.NormalPriority, stored.Priority)
 
-	require.NoError(t, repo.SetPriority(ctx, k.ID, apikey.MaxPriority))
-	promoted, err := repo.ByHash(ctx, apikey.HashKey(plaintext))
-	require.NoError(t, err)
-	require.Equal(t, apikey.MaxPriority, promoted.Priority)
+	require.NoError(t, repo.UpdateLimits(ctx, k.ID, apikey.Limits{
+		BatchMax:     50,
+		RatePerMin:   1000,
+		TokenBudget:  250_000_000,
+		BudgetPeriod: apikey.Monthly,
+		Priority:     apikey.MaxPriority,
+	}))
 
-	// Unknown ids are a no-op, like Revoke.
-	require.NoError(t, repo.SetPriority(ctx, 4242, apikey.MaxPriority))
+	updated, err := repo.ByHash(ctx, apikey.HashKey(plaintext))
+	require.NoError(t, err)
+	require.Equal(t, 50, updated.BatchMax)
+	require.Equal(t, 1000, updated.RatePerMin)
+	require.Equal(t, int64(250_000_000), updated.TokenBudget)
+	require.Equal(t, apikey.Monthly, updated.BudgetPeriod)
+	require.Equal(t, apikey.MaxPriority, updated.Priority)
+	// The identity and the audit trail are untouched by a limits change.
+	require.Equal(t, "main-site", updated.Name)
+	require.Equal(t, apikey.HashKey(plaintext), updated.KeyHash)
+
+	// An unknown id is loud: silently discarding a limit change would leave an
+	// operator believing they raised a cap that never moved.
+	require.ErrorIs(t, repo.UpdateLimits(ctx, 4242, updated.Limits()), apikey.ErrNotFound)
 }
 
 // TestUsageRepoSumTokens exercises the time-bucketed accounting the dashboard

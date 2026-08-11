@@ -70,7 +70,7 @@ client that gives up removes itself.
 ```bash
 ragctl create --name main-site --priority 9   # front-of-house
 ragctl create --name nightly-batch            # priority 0, the default
-ragctl priority --id 3 --priority 9           # promote a key already deployed
+ragctl update --id 3 --priority 9             # promote a key already deployed
 ```
 
 ## The live dashboard (CQRS)
@@ -187,7 +187,7 @@ OpenAI SDK clients surface them normally.
 
 ```
 cmd/gateway        HTTP gateway (composition root)
-cmd/ragctl         operator CLI: create/list/revoke keys
+cmd/ragctl         operator CLI: create/list/update/revoke keys
 internal/config    .env + env configuration
 internal/domain/   apikey + usage (pure business rules)
 internal/ratelimit per-token fixed-window limiter
@@ -257,9 +257,21 @@ open http://localhost:8080/admin
 # …and http://localhost:8080/ is the public page telling clients how to call it.
 ```
 
-`ragctl list` shows every key with its limits, queue rank and month/lifetime token
-usage; `ragctl priority --id <n> --priority <0-9>` re-ranks one and
-`ragctl revoke --id <n>` disables one.
+`ragctl list` shows every key with its limits, queue rank and month/lifetime
+token usage; `ragctl revoke --id <n>` disables one.
+
+Limits are editable in place, so raising a cap never means reissuing a key and
+redeploying it. Only the flags you pass change; the rest are left alone:
+
+```bash
+ragctl update --id 3 --rate 1200 --batch 50
+ragctl update --id 3 --budget 100000000 --period monthly
+ragctl update --id 3 --priority 9
+```
+
+The command prints a before/after diff of exactly what moved, validates against
+the same rules `create` uses, and refuses an unknown id rather than silently
+changing nothing.
 
 ## Development
 

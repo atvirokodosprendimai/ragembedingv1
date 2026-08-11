@@ -68,17 +68,29 @@ func (r *APIKeyRepo) List(ctx context.Context) ([]apikey.APIKey, error) {
 	return keys, nil
 }
 
-// SetPriority re-ranks a key in the admission queue. The caller validates the
-// rank (apikey.ValidPriority); this is a plain column write so an operator can
-// promote a live key without reissuing it. An unknown id is a no-op, matching
-// Revoke's idempotent shape.
-func (r *APIKeyRepo) SetPriority(ctx context.Context, id uint, priority int) error {
-	err := r.db.WithContext(ctx).
+// UpdateLimits writes a key's governance in one statement. The caller validates
+// the limits (apikey.Limits.Validate); this is a plain column write so an
+// operator can retune a live key without reissuing it.
+//
+// Unlike Revoke, an unknown id is an error rather than a no-op: revoking a key
+// that is already gone is harmless, but silently discarding a limit change
+// leaves an operator believing they raised a cap that never moved.
+func (r *APIKeyRepo) UpdateLimits(ctx context.Context, id uint, l apikey.Limits) error {
+	res := r.db.WithContext(ctx).
 		Model(&apikey.APIKey{}).
 		Where("id = ?", id).
-		Update("priority", priority).Error
-	if err != nil {
-		return fmt.Errorf("apikey repo: set priority: %w", err)
+		Updates(map[string]any{
+			"batch_max":     l.BatchMax,
+			"rate_per_min":  l.RatePerMin,
+			"token_budget":  l.TokenBudget,
+			"budget_period": l.BudgetPeriod,
+			"priority":      l.Priority,
+		})
+	if res.Error != nil {
+		return fmt.Errorf("apikey repo: update limits: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return apikey.ErrNotFound
 	}
 	return nil
 }

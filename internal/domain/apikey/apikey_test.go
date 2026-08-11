@@ -133,3 +133,55 @@ func TestValidPriority(t *testing.T) {
 		require.Equalf(t, c.want, ValidPriority(c.p), "ValidPriority(%d)", c.p)
 	}
 }
+
+// TestLimitsValidate pins every bound an operator can get wrong from the CLI.
+// Each invalid case here would otherwise produce a key that rejects every
+// request, with a message blaming the client rather than the configuration.
+func TestLimitsValidate(t *testing.T) {
+	sound := Limits{BatchMax: 25, RatePerMin: 400, TokenBudget: Unlimited, BudgetPeriod: Lifetime, Priority: 0}
+	require.NoError(t, sound.Validate())
+
+	prepaid := sound
+	prepaid.TokenBudget = 100_000_000
+	prepaid.BudgetPeriod = Monthly
+	require.NoError(t, prepaid.Validate())
+
+	cases := map[string]func(*Limits){
+		"zero batch":        func(l *Limits) { l.BatchMax = 0 },
+		"negative batch":    func(l *Limits) { l.BatchMax = -1 },
+		"zero rate":         func(l *Limits) { l.RatePerMin = 0 },
+		"zero budget":       func(l *Limits) { l.TokenBudget = 0 },
+		"budget below -1":   func(l *Limits) { l.TokenBudget = -5 },
+		"unknown period":    func(l *Limits) { l.BudgetPeriod = "weekly" },
+		"empty period":      func(l *Limits) { l.BudgetPeriod = "" },
+		"priority over max": func(l *Limits) { l.Priority = MaxPriority + 1 },
+		"negative priority": func(l *Limits) { l.Priority = -1 },
+	}
+	for name, break_ := range cases {
+		t.Run(name, func(t *testing.T) {
+			l := sound
+			break_(&l)
+			require.Error(t, l.Validate())
+		})
+	}
+}
+
+// TestApplyLimitsLeavesTheKeyUntouchedOnError: a rejected change must not
+// half-apply, or a typo silently rewrites the limits it did reach.
+func TestApplyLimitsLeavesTheKeyUntouchedOnError(t *testing.T) {
+	k := APIKey{BatchMax: 25, RatePerMin: 400, TokenBudget: Unlimited, BudgetPeriod: Lifetime, Priority: 9}
+	before := k.Limits()
+
+	err := k.ApplyLimits(Limits{BatchMax: 50, RatePerMin: 0, TokenBudget: Unlimited, BudgetPeriod: Lifetime})
+	require.Error(t, err)
+	require.Equal(t, before, k.Limits(), "a rejected change must leave the key exactly as it was")
+
+	require.NoError(t, k.ApplyLimits(Limits{
+		BatchMax: 50, RatePerMin: 1000, TokenBudget: 5_000_000, BudgetPeriod: Monthly, Priority: 3,
+	}))
+	require.Equal(t, 50, k.BatchMax)
+	require.Equal(t, 1000, k.RatePerMin)
+	require.Equal(t, int64(5_000_000), k.TokenBudget)
+	require.Equal(t, Monthly, k.BudgetPeriod)
+	require.Equal(t, 3, k.Priority)
+}

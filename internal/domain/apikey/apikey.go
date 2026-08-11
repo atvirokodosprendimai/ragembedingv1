@@ -7,6 +7,7 @@ import (
 	"encoding/base32"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -141,6 +142,75 @@ func (k APIKey) Remaining(usedThisMonth, usedLifetime int64) int64 {
 	return 0
 }
 
+// Limits is everything about a key an operator can change after issuing it:
+// what one request may ask for, how often, how much in total, and where the key
+// sits in the admission queue. The key's identity — its hash — is not in here,
+// because that is the one thing that must never change.
+//
+// Grouping them into a value means the rules are stated once. Before this, the
+// CLI restated each bound at creation time and nothing validated them on the way
+// in afterwards, which is how a key ends up with a rate limit of zero and
+// rejects every request.
+type Limits struct {
+	BatchMax     int
+	RatePerMin   int
+	TokenBudget  int64
+	BudgetPeriod BudgetPeriod
+	Priority     int
+}
+
+// Limits returns the key's current governance.
+func (k APIKey) Limits() Limits {
+	return Limits{
+		BatchMax:     k.BatchMax,
+		RatePerMin:   k.RatePerMin,
+		TokenBudget:  k.TokenBudget,
+		BudgetPeriod: k.BudgetPeriod,
+		Priority:     k.Priority,
+	}
+}
+
+// Validate reports the first thing wrong with these limits, phrased for the
+// operator who typed it. Every bound here would otherwise fail silently and
+// confusingly: a zero batch rejects every request as "too large", a zero rate
+// rejects every request as "too frequent", and a zero budget rejects every
+// request as out of quota.
+func (l Limits) Validate() error {
+	if l.BatchMax < 1 {
+		return fmt.Errorf("apikey: batch must be >= 1, got %d", l.BatchMax)
+	}
+	if l.RatePerMin < 1 {
+		return fmt.Errorf("apikey: rate must be >= 1 request/min, got %d", l.RatePerMin)
+	}
+	// Unlimited (-1) or any positive prepaid allowance is valid; 0 or below -1
+	// is not, since it would block every request or mean nothing.
+	if l.TokenBudget < Unlimited || l.TokenBudget == 0 {
+		return fmt.Errorf("apikey: budget must be %d (unlimited) or > 0, got %d", Unlimited, l.TokenBudget)
+	}
+	if !l.BudgetPeriod.Valid() {
+		return fmt.Errorf("apikey: period must be %q or %q, got %q", Monthly, Lifetime, l.BudgetPeriod)
+	}
+	if !ValidPriority(l.Priority) {
+		return fmt.Errorf("apikey: priority must be between %d and %d, got %d",
+			NormalPriority, MaxPriority, l.Priority)
+	}
+	return nil
+}
+
+// ApplyLimits validates l and, only if it is sound, writes it onto the key. A
+// rejected change leaves the key exactly as it was, so a typo cannot half-apply.
+func (k *APIKey) ApplyLimits(l Limits) error {
+	if err := l.Validate(); err != nil {
+		return err
+	}
+	k.BatchMax = l.BatchMax
+	k.RatePerMin = l.RatePerMin
+	k.TokenBudget = l.TokenBudget
+	k.BudgetPeriod = l.BudgetPeriod
+	k.Priority = l.Priority
+	return nil
+}
+
 // GenerateKey returns a new random plaintext key. It is generated with
 // crypto/rand and returned once to the operator; only its hash is persisted.
 func GenerateKey() (string, error) {
@@ -175,10 +245,12 @@ type Repository interface {
 	ByID(ctx context.Context, id uint) (*APIKey, error)
 	// List returns all keys, newest first, for the operator CLI and dashboard.
 	List(ctx context.Context) ([]APIKey, error)
-	// SetPriority re-ranks a key in the admission queue. It exists so an
-	// operator can promote an already-issued key (the main site's) without
-	// minting a replacement and re-deploying it.
-	SetPriority(ctx context.Context, id uint, priority int) error
+	// UpdateLimits writes a key's governance. It exists so an operator can
+	// retune an already-issued key — raise a rate limit, promote it in the
+	// queue, top up a budget — without minting a replacement and redeploying it.
+	// It reports ErrNotFound for an unknown id: changing governance is not the
+	// place for a silent no-op.
+	UpdateLimits(ctx context.Context, id uint, l Limits) error
 	// Revoke marks the key revoked; subsequent auth attempts fail.
 	Revoke(ctx context.Context, id uint) error
 }

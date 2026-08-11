@@ -26,7 +26,7 @@ func main() {
 		Commands: []*cli.Command{
 			createCommand(),
 			listCommand(),
-			priorityCommand(),
+			updateCommand(),
 			revokeCommand(),
 		},
 	}
@@ -70,58 +70,27 @@ func createCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "create",
 		Usage: "create a new API key (limits default from .env; the key is shown once)",
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			&cli.StringFlag{Name: "name", Usage: "human label for the key"},
-			&cli.IntFlag{Name: "batch", Usage: "max inputs per request"},
-			&cli.IntFlag{Name: "rate", Usage: "max requests per minute"},
-			&cli.Int64Flag{Name: "budget", Usage: "token budget: -1 for unlimited, or a prepaid count (e.g. 100000000)"},
-			&cli.StringFlag{Name: "period", Usage: "budget period: monthly|lifetime"},
-			&cli.IntFlag{Name: "priority", Usage: "admission-queue rank: 0 = free/normal, up to 9 for front-of-house traffic"},
-		},
+		}, limitFlags()...),
 		Action: func(ctx context.Context, c *cli.Command) error {
 			st, err := openStores()
 			if err != nil {
 				return err
 			}
 
-			// Flag value if the operator set it, else the configured default.
-			batch := st.cfg.Defaults.BatchMax
-			if c.IsSet("batch") {
-				batch = c.Int("batch")
-			}
-			rate := st.cfg.Defaults.RatePerMin
-			if c.IsSet("rate") {
-				rate = c.Int("rate")
-			}
-			tokenBudget := st.cfg.Defaults.TokenBudget
-			if c.IsSet("budget") {
-				tokenBudget = c.Int64("budget")
-			}
-			period := apikey.BudgetPeriod(st.cfg.Defaults.BudgetPeriod)
-			if c.IsSet("period") {
-				period = apikey.BudgetPeriod(c.String("period"))
-			}
-			priority := st.cfg.Defaults.Priority
-			if c.IsSet("priority") {
-				priority = c.Int("priority")
-			}
-
-			// Validate before touching the database so a bad flag fails cleanly.
-			if !period.Valid() {
-				return fmt.Errorf("invalid --period %q (want monthly or lifetime)", period)
-			}
-			if !apikey.ValidPriority(priority) {
-				return fmt.Errorf("--priority must be between %d and %d, got %d",
-					apikey.NormalPriority, apikey.MaxPriority, priority)
-			}
-			if batch < 1 {
-				return fmt.Errorf("--batch must be >= 1, got %d", batch)
-			}
-			if rate < 1 {
-				return fmt.Errorf("--rate must be >= 1, got %d", rate)
-			}
-			if tokenBudget < apikey.Unlimited || tokenBudget == 0 {
-				return fmt.Errorf("--budget must be -1 (unlimited) or > 0, got %d", tokenBudget)
+			// Start from the configured defaults and let the flags override.
+			limits := applyFlags(c, apikey.Limits{
+				BatchMax:     st.cfg.Defaults.BatchMax,
+				RatePerMin:   st.cfg.Defaults.RatePerMin,
+				TokenBudget:  st.cfg.Defaults.TokenBudget,
+				BudgetPeriod: apikey.BudgetPeriod(st.cfg.Defaults.BudgetPeriod),
+				Priority:     st.cfg.Defaults.Priority,
+			})
+			// Validated by the domain, in the same place `update` validates, so
+			// the two commands can never disagree about what is allowed.
+			if err := limits.Validate(); err != nil {
+				return err
 			}
 
 			plaintext, err := apikey.GenerateKey()
@@ -129,13 +98,11 @@ func createCommand() *cli.Command {
 				return fmt.Errorf("generating key: %w", err)
 			}
 			k := &apikey.APIKey{
-				Name:         c.String("name"),
-				KeyHash:      apikey.HashKey(plaintext),
-				BatchMax:     batch,
-				RatePerMin:   rate,
-				TokenBudget:  tokenBudget,
-				BudgetPeriod: period,
-				Priority:     priority,
+				Name:    c.String("name"),
+				KeyHash: apikey.HashKey(plaintext),
+			}
+			if err := k.ApplyLimits(limits); err != nil {
+				return err
 			}
 			if err := st.keys.Create(ctx, k); err != nil {
 				return err
@@ -192,42 +159,102 @@ func listCommand() *cli.Command {
 	}
 }
 
-// priorityCommand re-ranks an existing key in the admission queue. It exists so
-// the main site's already-deployed key can be promoted in place, without minting
-// a replacement and rolling it out.
-func priorityCommand() *cli.Command {
+// limitFlags are the tunable parameters, shared by create and update so the two
+// commands always speak the same language. Only the flags an operator actually
+// passes take effect; the rest keep the value they already had.
+func limitFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.IntFlag{Name: "batch", Usage: "max inputs per request"},
+		&cli.IntFlag{Name: "rate", Usage: "max requests per minute"},
+		&cli.Int64Flag{Name: "budget", Usage: "token budget: -1 for unlimited, or a prepaid count (e.g. 100000000)"},
+		&cli.StringFlag{Name: "period", Usage: "budget period: monthly|lifetime"},
+		&cli.IntFlag{Name: "priority", Usage: "admission-queue rank: 0 = free/normal, up to 9 for front-of-house traffic"},
+	}
+}
+
+// applyFlags overlays whatever the operator passed onto a starting set of
+// limits. c.IsSet is what makes "leave the rest alone" work: an unset flag reads
+// as its zero value, which for a rate limit would mean "reject everything".
+func applyFlags(c *cli.Command, l apikey.Limits) apikey.Limits {
+	if c.IsSet("batch") {
+		l.BatchMax = c.Int("batch")
+	}
+	if c.IsSet("rate") {
+		l.RatePerMin = c.Int("rate")
+	}
+	if c.IsSet("budget") {
+		l.TokenBudget = c.Int64("budget")
+	}
+	if c.IsSet("period") {
+		l.BudgetPeriod = apikey.BudgetPeriod(c.String("period"))
+	}
+	if c.IsSet("priority") {
+		l.Priority = c.Int("priority")
+	}
+	return l
+}
+
+// updateCommand retunes an already-issued key. It exists so limits can be raised
+// or lowered in place — the alternative is minting a replacement key and
+// redeploying it everywhere it is configured, which is a lot of risk for a
+// changed number.
+func updateCommand() *cli.Command {
 	return &cli.Command{
-		Name:  "priority",
-		Usage: "set a key's admission-queue rank (0 = free/normal, 9 = front-of-house)",
-		Flags: []cli.Flag{
-			&cli.UintFlag{Name: "id", Usage: "id of the key to re-rank", Required: true},
-			&cli.IntFlag{Name: "priority", Usage: "new rank, 0-9", Required: true},
-		},
+		Name:  "update",
+		Usage: "change an existing key's limits (only the flags you pass are changed)",
+		Flags: append([]cli.Flag{
+			&cli.UintFlag{Name: "id", Usage: "id of the key to update", Required: true},
+		}, limitFlags()...),
 		Action: func(ctx context.Context, c *cli.Command) error {
 			st, err := openStores()
 			if err != nil {
 				return err
 			}
-			priority := c.Int("priority")
-			if !apikey.ValidPriority(priority) {
-				return fmt.Errorf("--priority must be between %d and %d, got %d",
-					apikey.NormalPriority, apikey.MaxPriority, priority)
-			}
 
-			// Look the key up first so a typo'd id reports "not found" instead of
-			// silently updating nothing.
+			// Read first: the operator sees what actually changed, and a mistyped
+			// id fails before anything is written.
 			id := c.Uint("id")
 			k, err := st.keys.ByID(ctx, id)
 			if err != nil {
 				return err
 			}
-			if err := st.keys.SetPriority(ctx, id, priority); err != nil {
+
+			before := k.Limits()
+			after := applyFlags(c, before)
+			if after == before {
+				return fmt.Errorf("nothing to change: pass at least one of --batch, --rate, --budget, --period, --priority")
+			}
+			if err := after.Validate(); err != nil {
 				return err
 			}
-			fmt.Printf("key %d (%s): priority %s → %s\n",
-				id, dash(k.Name), priorityString(k.Priority), priorityString(priority))
+			if err := st.keys.UpdateLimits(ctx, id, after); err != nil {
+				return err
+			}
+
+			fmt.Printf("key %d (%s) updated:\n", id, dash(k.Name))
+			printChanges(before, after)
 			return nil
 		},
+	}
+}
+
+// printChanges reports only the fields that moved. Printing the untouched ones
+// too would bury the change an operator is trying to confirm.
+func printChanges(before, after apikey.Limits) {
+	if before.BatchMax != after.BatchMax {
+		fmt.Printf("  batch:    %d → %d inputs/request\n", before.BatchMax, after.BatchMax)
+	}
+	if before.RatePerMin != after.RatePerMin {
+		fmt.Printf("  rate:     %d → %d requests/min\n", before.RatePerMin, after.RatePerMin)
+	}
+	if before.TokenBudget != after.TokenBudget {
+		fmt.Printf("  budget:   %s → %s tokens\n", budgetString(before.TokenBudget), budgetString(after.TokenBudget))
+	}
+	if before.BudgetPeriod != after.BudgetPeriod {
+		fmt.Printf("  period:   %s → %s\n", before.BudgetPeriod, after.BudgetPeriod)
+	}
+	if before.Priority != after.Priority {
+		fmt.Printf("  priority: %s → %s\n", priorityString(before.Priority), priorityString(after.Priority))
 	}
 }
 
