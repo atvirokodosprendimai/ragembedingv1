@@ -1,10 +1,10 @@
 # ragembedingv1
 
 An authenticating, rate-limiting, usage-metering proxy in front of an Ollama
-embeddings pool. Clients speak the OpenAI `/v1/embeddings` API with a per-token
-API key; the gateway enforces per-key limits, forwards accepted requests to a
-Caddy load balancer that fans out across 10 Ollama backends, and records the
-`bge-m3` token usage Ollama reports.
+embeddings pool. Clients speak either the OpenAI `/v1/embeddings` API or Ollama's
+native `/api/embed`, with a per-token API key; the gateway enforces per-key
+limits, forwards accepted requests to a Caddy load balancer that fans out across
+10 Ollama backends, and records the `bge-m3` token usage Ollama reports.
 
 ```
 client ──Bearer sk-rag-…──▶ gateway ──▶ Caddy (:11435) ──▶ ollama-1 … ollama-10
@@ -14,10 +14,18 @@ client ──Bearer sk-rag-…──▶ gateway ──▶ Caddy (:11435) ──�
 
 ## What it does
 
+- **Two endpoints, one pipeline** — `POST /v1/embeddings` (OpenAI-compatible,
+  for SDK clients) and `POST /api/embed` (Ollama native). Both take the same
+  polymorphic `input` (a string, or an array for a batch) and go through the
+  same auth, batch, rate, budget, queue and accounting path. They differ only in
+  how the upstream reports tokens — `usage.prompt_tokens` vs
+  `prompt_eval_count` — and both are billed identically. Note the old
+  single-prompt `/api/embeddings` (plural) is **not** proxied: it takes one
+  `prompt`, not a batch.
 - **Per-token API keys** — SQLite-backed (pure Go, **no cgo**), only the SHA-256
   hash is stored. Keys are issued from the CLI, never self-service.
-- **Batch limit** — rejects an `/v1/embeddings` request whose `input` array
-  exceeds the key's `batch_max` (default 25) with `400`.
+- **Batch limit** — rejects a request whose `input` array exceeds the key's
+  `batch_max` (default 25) with `400`.
 - **Rate limit** — per-key requests/minute (default 400). Over the limit returns
   `429` with a `Retry-After` header telling the client exactly how long to wait.
 - **Token budget** — each key has a budget of `bge-m3` input tokens:
@@ -155,6 +163,12 @@ go run ./cmd/ragctl create --name batch --budget 100000000 --period monthly --ba
 
 # 4. Use it exactly like the OpenAI embeddings API:
 curl http://localhost:8080/v1/embeddings \
+  -H "Authorization: Bearer sk-rag-…" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"bge-m3","input":["hello","world"]}'
+
+# …or Ollama's native batch endpoint, same key, same limits:
+curl http://localhost:8080/api/embed \
   -H "Authorization: Bearer sk-rag-…" \
   -H "Content-Type: application/json" \
   -d '{"model":"bge-m3","input":["hello","world"]}'

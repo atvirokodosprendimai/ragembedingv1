@@ -45,10 +45,15 @@ func (rt Router) Handler() http.Handler {
 	// Public liveness probe.
 	r.Get("/healthz", healthz)
 
-	// Authenticated embeddings API.
+	// Authenticated embeddings API. Both spellings of the same operation are
+	// served by the same enforcement pipeline: the OpenAI-compatible route that
+	// SDK clients use, and Ollama's native batch route. They take the same
+	// polymorphic "input" field, so batch, rate, budget and queue limits apply
+	// identically; only the upstream's token-count field name differs.
 	r.Group(func(r chi.Router) {
 		r.Use(BearerAuth(rt.Keys, rt.Logger))
 		r.Post("/v1/embeddings", rt.Embeddings.Embeddings)
+		r.Post("/api/embed", rt.Embeddings.Embeddings)
 	})
 
 	// Operator dashboard, mounted at root so it serves "/", "/keys/{id}",
