@@ -89,6 +89,9 @@ type Config struct {
 	CaddyUpstreamURL string
 	// EmbedModel is the embedding model name recorded with usage (bge-m3).
 	EmbedModel string
+	// ContactEmail is published on the landing page as the address to ask for a
+	// key at. It is operator-facing contact detail, not a secret.
+	ContactEmail string
 	// Defaults are the per-token limit fallbacks.
 	Defaults Defaults
 	// Queue is the upstream admission queue's configuration.
@@ -117,6 +120,7 @@ func Load() (Config, error) {
 		DBPath:           envStr("DB_PATH", "ragembed.db"),
 		CaddyUpstreamURL: envStr("CADDY_UPSTREAM_URL", "http://localhost:11435"),
 		EmbedModel:       envStr("EMBED_MODEL", "bge-m3"),
+		ContactEmail:     envStr("CONTACT_EMAIL", "info@ituoga.lt"),
 		Defaults: Defaults{
 			BatchMax:     envInt("DEFAULT_BATCH_MAX", 25),
 			RatePerMin:   envInt("DEFAULT_RATE_PER_MIN", 400),

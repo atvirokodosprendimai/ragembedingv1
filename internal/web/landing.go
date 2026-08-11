@@ -17,17 +17,24 @@ type LandingServer struct {
 	model      string
 	batchMax   int
 	ratePerMin int
+	contact    string
 	logger     *slog.Logger
 }
 
 // NewLanding builds the landing page from the gateway's own configuration, so
 // the limits it documents are the ones the gateway actually applies to a new key
 // rather than numbers copied into prose and left to rot.
-func NewLanding(model string, batchMax, ratePerMin int, logger *slog.Logger) *LandingServer {
+func NewLanding(model string, batchMax, ratePerMin int, contact string, logger *slog.Logger) *LandingServer {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &LandingServer{model: model, batchMax: batchMax, ratePerMin: ratePerMin, logger: logger}
+	return &LandingServer{
+		model:      model,
+		batchMax:   batchMax,
+		ratePerMin: ratePerMin,
+		contact:    contact,
+		logger:     logger,
+	}
 }
 
 // Handler returns the landing page's routes: the page itself and its stylesheet.
@@ -55,7 +62,10 @@ type LandingVM struct {
 	BatchMax   string
 	RatePerMin string
 	AdminPath  string
-	Statuses   []StatusVM
+	// ContactEmail is who to ask for a key. There is no self-service signup, so
+	// without it the page tells a visitor to ask someone it cannot name.
+	ContactEmail string
+	Statuses     []StatusVM
 }
 
 // StatusVM is one row of the status-code contract.
@@ -69,11 +79,12 @@ type StatusVM struct {
 // build assembles the page for this request.
 func (s *LandingServer) build(r *http.Request) LandingVM {
 	return LandingVM{
-		Model:      s.model,
-		BaseURL:    baseURL(r),
-		BatchMax:   strconv.Itoa(s.batchMax),
-		RatePerMin: strconv.Itoa(s.ratePerMin),
-		AdminPath:  BasePath,
+		Model:        s.model,
+		BaseURL:      baseURL(r),
+		BatchMax:     strconv.Itoa(s.batchMax),
+		RatePerMin:   strconv.Itoa(s.ratePerMin),
+		AdminPath:    BasePath,
+		ContactEmail: s.contact,
 		Statuses: []StatusVM{
 			{Code: "200", Meaning: "Embeddings returned", Action: "—", Tone: "ok"},
 			{Code: "400", Meaning: "Bad JSON, or more inputs than your batch limit", Action: "Fix the request", Tone: "bad"},

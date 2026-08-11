@@ -38,10 +38,9 @@ client ──Bearer sk-rag-…──▶ gateway ──▶ Caddy (:11435) ──�
   they are contended, the operator's own site goes first. See below.
 - **Token accounting** — the authoritative token count comes from Ollama's
   `usage.prompt_tokens`, recorded per key per request.
-- **Usage dashboard** — a datastar/templ terminal-style dashboard with a live
-  pool-pressure strip (slots busy, who is queued, who is being promoted) and each
-  key's tokens across **today, this week, this month, past month, and earlier**,
-  plus prepaid budget consumption.
+- **Live usage dashboard** — a datastar/templ terminal-style dashboard. Each key
+  is its own page, and one SSE connection per page streams a live pool-pressure
+  strip plus that key's usage the moment a call is recorded. See below.
 
 ## The priority queue
 
@@ -73,6 +72,51 @@ ragctl create --name main-site --priority 9   # front-of-house
 ragctl create --name nightly-batch            # priority 0, the default
 ragctl priority --id 3 --priority 9           # promote a key already deployed
 ```
+
+## The live dashboard (CQRS)
+
+Usage is CQRS-shaped: the request path is the single writer — it records one
+event after the upstream reports its token count — and everything on screen is a
+reader.
+
+```
+proxy handler ──record()──▶ usage store        (write side, one writer)
+                    └──────▶ Hub.Publish()     (notify)
+                                 │
+                            key actor          (owns that key's read model)
+                                 │
+                            subscribers        (one SSE stream per viewer)
+```
+
+`internal/live` runs **one goroutine per watched key**. That actor owns the key's
+report and is the only thing that mutates it, so the read model needs no lock:
+credits from the write side and periodic resyncs from the store are applied by
+that single goroutine, in order. An actor exists only while somebody is watching
+— the first subscriber starts it, the last to leave retires it — so nothing
+accumulates for keys nobody has open, and a closed tab reaps its goroutine.
+
+The dashboard is a **multi-page app**: `/admin/keys/{id}` is a real URL, so keys
+are bookmarkable, shareable, and reachable with the back button. The page opens
+exactly one stream with `data-init="@get('/admin/keys/{id}/live')"`, and the
+server decides what to push and how often:
+
+```go
+for {
+    select {
+    case <-r.Context().Done(): return          // tab closed → unsubscribe → actor retires
+    case <-ticker.C:          push(queue)      // pool pressure, server's cadence
+    case snap := <-snapshots: push(detail, row, total)   // the instant usage is recorded
+    }
+}
+```
+
+There is no polling and no client-side state. Measured against a real Ollama, a
+recorded call reaches the screen **~2 ms after the write** — the previous polling
+dashboard showed it up to 30 s later, and paid a query per viewer per tick to be
+that stale.
+
+One caveat: the sidebar figures for *other* keys are a page-load snapshot. Only
+the key you are watching streams, which is the point of an actor per key.
 
 ## Pages
 
@@ -134,6 +178,7 @@ internal/domain/   apikey + usage (pure business rules)
 internal/ratelimit per-token fixed-window limiter
 internal/budget    prepaid-allowance checker
 internal/queue     priority admission queue in front of the pool
+internal/live      CQRS read side: one goroutine per watched key
 internal/proxy     /v1/embeddings enforcement pipeline + forwarder
 internal/httpapi   chi router + Bearer-auth middleware
 internal/web       datastar/templ dashboard (/admin) + public landing page (/)
@@ -152,6 +197,7 @@ Copy `.env.example` to `.env`. Real environment variables override `.env`.
 | `DB_PATH` | `ragembed.db` | SQLite file (keys + usage) |
 | `CADDY_UPSTREAM_URL` | `http://localhost:11435` | The Caddy load balancer |
 | `EMBED_MODEL` | `bge-m3` | Model name recorded with usage |
+| `CONTACT_EMAIL` | `info@ituoga.lt` | Address published on the landing page for key requests |
 | `DEFAULT_BATCH_MAX` | `25` | Default inputs/request per key |
 | `DEFAULT_RATE_PER_MIN` | `400` | Default requests/min per key |
 | `DEFAULT_TOKEN_BUDGET` | `-1` | Default token budget (`-1` = unlimited) |

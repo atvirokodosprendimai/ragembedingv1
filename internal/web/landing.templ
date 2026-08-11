@@ -150,12 +150,18 @@ print(len(vectors.data), "vectors")`)
 						<h2 id="getkey"><span class="tick">08</span> Getting a key</h2>
 						<p>
 							Keys are issued by the operator — there is no self-service signup.
-							Ask for one, and say roughly how much you expect to embed so your
-							batch, rate and budget can be set sensibly.
+							Email us and say roughly how much you expect to embed, so your batch,
+							rate and budget can be set sensibly.
+						</p>
+						<p>
+							<a class="mailto" href={ templ.SafeURL("mailto:" + vm.ContactEmail + "?subject=ragembed%20API%20key") }>
+								<span class="tick" aria-hidden="true">✉</span>
+								{ vm.ContactEmail }
+							</a>
 						</p>
 						<p class="note">
-							Keep it secret: only its hash is stored here, so a lost key cannot be
-							recovered, only replaced.
+							Keep the key secret: only its hash is stored here, so a lost key
+							cannot be recovered, only replaced.
 						</p>
 					</section>
 				</main>

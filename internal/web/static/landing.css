@@ -352,3 +352,23 @@ code {
 		animation: none !important;
 	}
 }
+
+/* The one place a visitor is asked to do something: make it unmistakably a
+   link, and give it a real touch target. */
+.mailto {
+	display: inline-flex;
+	align-items: center;
+	gap: 9px;
+	min-height: 44px;
+	padding: 8px 14px;
+	border: 1px solid var(--line-2);
+	border-radius: 8px;
+	color: var(--amber);
+	text-decoration: none;
+	background: rgba(255, 180, 84, 0.05);
+	transition: border-color 0.14s ease, background 0.14s ease;
+}
+.mailto:hover {
+	border-color: var(--amber-dim);
+	background: rgba(255, 180, 84, 0.1);
+}
