@@ -30,6 +30,10 @@ templ Landing(vm LandingVM) {
 			<meta property="og:url" content={ vm.BaseURL + "/" }/>
 			<meta property="og:locale" content="lt_LT"/>
 			<link rel="stylesheet" href="/assets/landing.css"/>
+			// The service and its price, machine-readable. An assistant asked what a
+			// Lithuanian embeddings API costs should not have to infer the number
+			// from prose.
+			@templ.Raw(`<script type="application/ld+json">` + vm.JSONLD + `</script>`)
 		</head>
 		<body>
 			<div class="page">
@@ -126,8 +130,21 @@ print(len(vektoriai.data), "vektoriai")`)
 							savo sunaudojimą matote patys, nieko neklausdami.
 						</p>
 					</section>
+					<section aria-labelledby="kaina">
+						<h2 id="kaina"><span class="tick">06</span> Kiek kainuoja</h2>
+						<p>
+							Vienas planas ir viena suma per mėnesį. Mokesčio už tokeną nėra, todėl
+							perindeksavimas — dažniausia išlaidų staigmena vektorinėse sistemose —
+							sąskaitos nekeičia.
+						</p>
+						@planCard(vm)
+						<p class="note">
+							Sąskaita išrašoma mėnesiui. Jei reikia didesnio dažnio ar didesnių
+							paketų, parašykite — limitai nustatomi kiekvienam raktui atskirai.
+						</p>
+					</section>
 					<section aria-labelledby="apkrova">
-						<h2 id="apkrova"><span class="tick">06</span> Kai serveris apkrautas</h2>
+						<h2 id="apkrova"><span class="tick">07</span> Kai serveris apkrautas</h2>
 						<p>
 							Užklausos rikiuojamos į eilę, o ne atmetamos. Esant apkrovai jūsų
 							užklausa laukia laisvos vietos, o ne krenta su klaida — staigus
@@ -137,7 +154,7 @@ print(len(vektoriai.data), "vektoriai")`)
 						</p>
 					</section>
 					<section aria-labelledby="kodai">
-						<h2 id="kodai"><span class="tick">07</span> Ką reiškia atsakymų kodai</h2>
+						<h2 id="kodai"><span class="tick">08</span> Ką reiškia atsakymų kodai</h2>
 						<div class="table-scroll">
 							<table class="statuses">
 								<thead>
@@ -165,7 +182,7 @@ print(len(vektoriai.data), "vektoriai")`)
 						</p>
 					</section>
 					<section aria-labelledby="raktas">
-						<h2 id="raktas"><span class="tick">08</span> Kaip gauti raktą</h2>
+						<h2 id="raktas"><span class="tick">09</span> Kaip gauti raktą</h2>
 						<p>
 							Raktus išduoda operatorius — savitarnos registracijos nėra. Parašykite
 							mums ir trumpai nurodykite, kiek maždaug tekstų planuojate apdoroti,
@@ -178,7 +195,7 @@ print(len(vektoriai.data), "vektoriai")`)
 						</p>
 					</section>
 					<section aria-labelledby="daugiau">
-						<h2 id="daugiau"><span class="tick">09</span> Nesate tikri, ar jums to reikia?</h2>
+						<h2 id="daugiau"><span class="tick">10</span> Nesate tikri, ar jums to reikia?</h2>
 						<p>
 							Parašėme išsamų straipsnį apie tai, kas yra embeddingai, kada jų verta
 							imtis, kada tikrai neverta, ir ką daryti su asmens duomenimis pagal
@@ -202,6 +219,52 @@ print(len(vektoriai.data), "vektoriai")`)
 			</div>
 		</body>
 	</html>
+}
+
+// planCard renders the offer: the price, and the three limits it buys.
+//
+// There is one plan, so there is no grid of tiers to compare — a card row would
+// be borrowed furniture. It is laid out as a receipt instead, which is both
+// honest about the product and native to the terminal voice of the rest of the
+// page.
+//
+// The three included limits are the same values section 05 documents, restated
+// here in buyer's language. That repetition is deliberate: a reader who scrolls
+// to the price should not have to scroll back to learn what the price is for.
+// Both readings come from the same view model, so they cannot disagree.
+templ planCard(vm LandingVM) {
+	<div class="plan">
+		<p class="plan-eyebrow">vienas planas</p>
+		<p class="plan-price">
+			// The symbol is nested inside the figure rather than set beside it: at
+			// 46px a full monospace space between "50" and "€" reads as a gap, not
+			// as one price.
+			<span class="plan-figure">
+				{ vm.Plan.PriceExVAT }<span class="plan-currency">€</span>
+			</span>
+			if vm.Plan.HasVAT() {
+				<span class="plan-vat">+ PVM</span>
+			}
+			<span class="plan-period">/ mėn.</span>
+		</p>
+		if vm.Plan.HasVAT() {
+			// The figure that actually lands on the invoice. A reader who cannot
+			// reclaim VAT should not have to do the multiplication to find out
+			// what they will be charged.
+			<p class="plan-incl">{ vm.Plan.PriceIncVAT } € su PVM ({ vm.Plan.VATLabel })</p>
+		}
+		<ul class="plan-includes">
+			<li><b>Tokenai — { vm.TokenBudget }</b>. Mokesčio už apdorotą tokeną nėra.</li>
+			<li><b>{ vm.RatePhrase }</b> vienam raktui.</li>
+			<li><b>{ vm.BatchPhrase }</b> — paketais, ne po vieną.</li>
+		</ul>
+		<p class="plan-cta">
+			<a class="mailto" href="#raktas">
+				<span class="tick" aria-hidden="true">→</span>
+				Kaip gauti raktą
+			</a>
+		</p>
+	</div>
 }
 
 // contactLinks renders the ways to reach a human. Email and phone sit together

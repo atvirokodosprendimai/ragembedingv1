@@ -109,7 +109,20 @@ func Article(vm ArticleVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</b> yra daugiakalbis modelis ir lietuvišką tekstą apdoroja tiesiogiai — versti į anglų kalbą prieš vektorizavimą nereikia.</p><p>Tai svarbiau, nei atrodo. Vertimas prieš vektorizavimą praranda dalį reikšmės, ypač specifinėje terminijoje, ir prideda dar vieną vietą, kurioje gali įvykti klaida. Modelis, kuris lietuviškai „supranta“ iš karto, tokio tarpinio žingsnio nereikalauja.</p></section><section aria-labelledby=\"kaina\"><h2 id=\"kaina\">Kiek tai kainuoja</h2><p>Debesijos paslaugos ima mokestį už kiekvieną apdorotą tokeną. Tai patogu pradžioje ir nemalonu vėliau: kaina auga kartu su duomenų kiekiu, o kiekvienas perindeksavimas — pakeitus modelį ar teksto skaidymo taisykles — reiškia sąskaitą iš naujo.</p><p>Savame serveryje mokate už techniką ir jos priežiūrą, o užklausų kiekis kainos nekeičia. Lūžio taškas priklauso ne tiek nuo dokumentų kiekio, kiek nuo to, kaip dažnai juos perindeksuojate. Eksperimentų etape tai vyksta dažniau, nei planuojama.</p><p class=\"note\">Praktinis matas: pasižiūrėkite, kiek tekstų turite šiandien, ir padauginkite iš to, kiek kartų per metus tikitės keisti indeksavimo logiką. Jei atsakymas didesnis už kelis kartus — skaičiuokite abu variantus.</p></section><section aria-labelledby=\"kaip-prijungti\"><h2 id=\"kaip-prijungti\">Kaip prijungti prie esamos sistemos</h2><p>Sąsaja suderinama su OpenAI, todėl dažniausiai užtenka pakeisti bazinį adresą ir raktą. Esamas kodas, biblioteka ir vektorių saugykla lieka tie patys.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</b> yra daugiakalbis modelis ir lietuvišką tekstą apdoroja tiesiogiai — versti į anglų kalbą prieš vektorizavimą nereikia.</p><p>Tai svarbiau, nei atrodo. Vertimas prieš vektorizavimą praranda dalį reikšmės, ypač specifinėje terminijoje, ir prideda dar vieną vietą, kurioje gali įvykti klaida. Modelis, kuris lietuviškai „supranta“ iš karto, tokio tarpinio žingsnio nereikalauja.</p></section><section aria-labelledby=\"kaina\"><h2 id=\"kaina\">Kiek tai kainuoja</h2><p>Debesijos paslaugos ima mokestį už kiekvieną apdorotą tokeną. Tai patogu pradžioje ir nemalonu vėliau: kaina auga kartu su duomenų kiekiu, o kiekvienas perindeksavimas — pakeitus modelį ar teksto skaidymo taisykles — reiškia sąskaitą iš naujo.</p><p>Savame serveryje mokate už techniką ir jos priežiūrą, o užklausų kiekis kainos nekeičia. Lūžio taškas priklauso ne tiek nuo dokumentų kiekio, kiek nuo to, kaip dažnai juos perindeksuojate. Eksperimentų etape tai vyksta dažniau, nei planuojama.</p><p>Šios paslaugos kaina — <b>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Plan.priceSentence())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 200, Col: 62}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</b>. Mokesčio už apdorotą tokeną nėra, todėl perindeksavimas sąskaitos nekeičia. Limitai ir sąlygos — <a href=\"/#kaina\">pradžios puslapyje</a>.</p><p class=\"note\">Praktinis matas: pasižiūrėkite, kiek tekstų turite šiandien, ir padauginkite iš to, kiek kartų per metus tikitės keisti indeksavimo logiką. Jei atsakymas didesnis už kelis kartus — skaičiuokite abu variantus.</p></section><section aria-labelledby=\"kaip-prijungti\"><h2 id=\"kaip-prijungti\">Kaip prijungti prie esamos sistemos</h2><p>Sąsaja suderinama su OpenAI, todėl dažniausiai užtenka pakeisti bazinį adresą ir raktą. Esamas kodas, biblioteka ir vektorių saugykla lieka tie patys.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -120,56 +133,56 @@ func Article(vm ArticleVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<p>Viena užklausa apdoroja iki <b>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<p>Viena užklausa apdoroja iki <b>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(vm.BatchMax)
+		var templ_7745c5c3_Var8 string
+		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(vm.BatchMax)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 218, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 223, Col: 53}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</b> tekstų, o vektoriai grįžta ta pačia tvarka, kuria juos išsiuntėte. Visa techninė dokumentacija — <a href=\"/\">pradžios puslapyje</a>.</p></section><section aria-labelledby=\"apkrova\"><h2 id=\"apkrova\">Kas nutinka esant apkrovai</h2><p>Kai vienu metu ateina daugiau užklausų, nei serveris gali apdoroti, jos rikiuojamos į eilę, o ne atmetamos. Staigus srautas virsta ilgesniu atsakymo laiku, o ne klaidų lavina — nereikia nei kartoti užklausų, nei gaudyti klaidų.</p><p>Eilė turi prioritetus: interaktyvus srautas aptarnaujamas pirmiau nei naktinis paketinis apdorojimas. Tačiau ilgiau laukusi užklausa praleidžiama pirmiau už aukštesnio prioriteto srautą, todėl paketiniai darbai neužstringa neribotam laikui.</p></section><section aria-labelledby=\"duk\"><h2 id=\"duk\">Dažniausi klausimai</h2><dl class=\"faq\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</b> tekstų, o vektoriai grįžta ta pačia tvarka, kuria juos išsiuntėte. Visa techninė dokumentacija — <a href=\"/\">pradžios puslapyje</a>.</p></section><section aria-labelledby=\"apkrova\"><h2 id=\"apkrova\">Kas nutinka esant apkrovai</h2><p>Kai vienu metu ateina daugiau užklausų, nei serveris gali apdoroti, jos rikiuojamos į eilę, o ne atmetamos. Staigus srautas virsta ilgesniu atsakymo laiku, o ne klaidų lavina — nereikia nei kartoti užklausų, nei gaudyti klaidų.</p><p>Eilė turi prioritetus: interaktyvus srautas aptarnaujamas pirmiau nei naktinis paketinis apdorojimas. Tačiau ilgiau laukusi užklausa praleidžiama pirmiau už aukštesnio prioriteto srautą, todėl paketiniai darbai neužstringa neribotam laikui.</p></section><section aria-labelledby=\"duk\"><h2 id=\"duk\">Dažniausi klausimai</h2><dl class=\"faq\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, item := range vm.FAQ {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<dt>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var8 string
-			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(item.Q)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 242, Col: 21}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</dt><dd>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<dt>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(item.A)
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(item.Q)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 243, Col: 21}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 247, Col: 21}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</dd>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</dt><dd>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var10 string
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(item.A)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 248, Col: 21}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</dd>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</dl></section><section aria-labelledby=\"pradeti\" class=\"cta\"><h2 id=\"pradeti\">Nuo ko pradėti</h2><p>Paprasčiausias pirmas žingsnis — paimti šimtą tikrų savo dokumentų ir patikrinti, ar paieška randa tai, ko žmonės iš tikrųjų klausia. Tam užtenka rakto ir kelių valandų.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</dl></section><section aria-labelledby=\"pradeti\" class=\"cta\"><h2 id=\"pradeti\">Nuo ko pradėti</h2><p>Paprasčiausias pirmas žingsnis — paimti šimtą tikrų savo dokumentų ir patikrinti, ar paieška randa tai, ko žmonės iš tikrųjų klausia. Tam užtenka rakto ir kelių valandų.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -177,46 +190,46 @@ func Article(vm ArticleVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</section></article></main><footer class=\"foot\"><span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</section></article></main><footer class=\"foot\"><span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var10 string
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Model)
+		var templ_7745c5c3_Var11 string
+		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Model)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 260, Col: 16}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, " embeddingai · <a class=\"admin-link\" href=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var11 templ.SafeURL
-		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(vm.Contact.CompanyURL))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 261, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 265, Col: 16}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, " embeddingai · <a class=\"admin-link\" href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var12 string
-		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Contact.CompanyName)
+		var templ_7745c5c3_Var12 templ.SafeURL
+		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(vm.Contact.CompanyURL))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 261, Col: 98}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 266, Col: 71}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</a></span> <a class=\"admin-link\" href=\"/\">← techninė dokumentacija</a></footer></div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var13 string
+		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Contact.CompanyName)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 266, Col: 98}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</a></span> <a class=\"admin-link\" href=\"/\">← techninė dokumentacija</a></footer></div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -33,7 +33,8 @@ type Defaults struct {
 	// request. The product default is 25.
 	BatchMax int
 	// RatePerMin is the largest number of requests a key may make per minute.
-	// The product default is 400.
+	// The product default is 100, which is what the published plan sells: a new
+	// key must not silently receive more headroom than the page promises.
 	RatePerMin int
 	// TokenBudget caps bge-m3 input tokens. -1 means unlimited (on-demand); any
 	// positive value is a prepaid allowance.
@@ -44,6 +45,26 @@ type Defaults struct {
 	// Priority is the admission-queue rank a new key is issued with. 0 is the
 	// free tier; the operator raises it (up to 9) for front-of-house traffic.
 	Priority int
+}
+
+// Plan is the published commercial offer: one plan, one price. It lives in
+// configuration rather than in the page's prose for the same reason the limits
+// do — a number written into markup is a number nobody remembers to change, and
+// this one is quoted back at the operator in an invoice.
+//
+// Only the money is here. What the plan *includes* is already configuration:
+// Defaults.BatchMax, Defaults.RatePerMin and Defaults.TokenBudget are the limits
+// a new key is actually issued with, so the page describes the plan by reading
+// them rather than by restating them.
+type Plan struct {
+	// PriceEUR is the monthly price in whole euros, excluding VAT. Lithuanian
+	// B2B quotes are made excluding VAT, so that is the figure that is stored
+	// and the derived VAT-inclusive one is computed for display.
+	PriceEUR int
+	// VATPercent is the Lithuanian PVM rate applied at invoicing. It is
+	// configurable because a VAT rate is set by law, not by this service, and
+	// changing it must not require a rebuild.
+	VATPercent int
 }
 
 // Dashboard is the operator dashboard's access control. The dashboard lists
@@ -101,6 +122,8 @@ type Config struct {
 	CompanyURL string
 	// Defaults are the per-token limit fallbacks.
 	Defaults Defaults
+	// Plan is the published price for those defaults.
+	Plan Plan
 	// Queue is the upstream admission queue's configuration.
 	Queue Queue
 	// Dashboard guards the operator UI.
@@ -132,10 +155,14 @@ func Load() (Config, error) {
 		CompanyURL:       envStr("COMPANY_URL", "https://letas.lt"),
 		Defaults: Defaults{
 			BatchMax:     envInt("DEFAULT_BATCH_MAX", 25),
-			RatePerMin:   envInt("DEFAULT_RATE_PER_MIN", 400),
+			RatePerMin:   envInt("DEFAULT_RATE_PER_MIN", 100),
 			TokenBudget:  envInt64("DEFAULT_TOKEN_BUDGET", -1),
 			BudgetPeriod: envStr("DEFAULT_BUDGET_PERIOD", periodLifetime),
 			Priority:     envInt("DEFAULT_PRIORITY", 0),
+		},
+		Plan: Plan{
+			PriceEUR:   envInt("PLAN_PRICE_EUR", 50),
+			VATPercent: envInt("PLAN_VAT_PERCENT", 21),
 		},
 		Queue: Queue{
 			// One slot per Ollama backend in the reference topology.
@@ -177,6 +204,15 @@ func (c Config) validate() error {
 	}
 	if c.Defaults.Priority < 0 || c.Defaults.Priority > maxPriority {
 		return fmt.Errorf("config: DEFAULT_PRIORITY must be between 0 and %d, got %d", maxPriority, c.Defaults.Priority)
+	}
+	// A price of zero would publish a paid service as free, and a negative VAT
+	// rate would print a discount on the invoice. Both are the kind of typo that
+	// is only noticed by the person who was charged the wrong amount.
+	if c.Plan.PriceEUR < 1 {
+		return fmt.Errorf("config: PLAN_PRICE_EUR must be >= 1, got %d", c.Plan.PriceEUR)
+	}
+	if c.Plan.VATPercent < 0 || c.Plan.VATPercent > 100 {
+		return fmt.Errorf("config: PLAN_VAT_PERCENT must be between 0 and 100, got %d", c.Plan.VATPercent)
 	}
 	// A queue of zero would admit nothing at all, and a non-positive promotion
 	// window would promote every waiter immediately, collapsing priority into

@@ -35,6 +35,11 @@ type ArticleVM struct {
 	CanonicalURL string
 	Contact      Contact
 	BatchMax     string
+	// Plan is the published price. The article's "how much does it cost"
+	// section is the highest-intent thing on the page — somebody reading it has
+	// a project and a budget — and until now it explained the economics without
+	// ever naming a figure.
+	Plan Plan
 	// FAQ is rendered twice: as visible questions and answers, and as JSON-LD.
 	// One source for both, so the structured data can never claim something the
 	// page does not actually say — which is what makes it a valid FAQPage rather
@@ -66,7 +71,8 @@ func (s *LandingServer) buildArticle(r *http.Request) ArticleVM {
 		CanonicalURL: base + articlePath,
 		Contact:      s.contact,
 		BatchMax:     intStr(s.batchMax),
-		FAQ:          articleFAQ(s.model),
+		Plan:         s.plan,
+		FAQ:          articleFAQ(s.model, s.plan),
 	}
 	vm.JSONLD = articleJSONLD(vm)
 	return vm
@@ -75,7 +81,7 @@ func (s *LandingServer) buildArticle(r *http.Request) ArticleVM {
 // articleFAQ is the question list. Each one is phrased the way somebody would
 // type it into a search box, because that is what it has to match — not the way
 // a product page would phrase it.
-func articleFAQ(model string) []FAQItem {
+func articleFAQ(model string, plan Plan) []FAQItem {
 	return []FAQItem{
 		{
 			Q: "Kas yra embeddingai paprastais žodžiais?",
@@ -108,7 +114,8 @@ func articleFAQ(model string) []FAQItem {
 			A: "Debesijos paslaugos ima mokestį už kiekvieną apdorotą tokeną, todėl kaina auga kartu " +
 				"su duomenų kiekiu ir su kiekvienu pakartotiniu indeksavimu. Savame serveryje " +
 				"mokate už techniką ir jos priežiūrą, o užklausų kiekis kainos nekeičia. Lūžio " +
-				"taškas priklauso nuo to, kiek ir kaip dažnai perindeksuojate.",
+				"taškas priklauso nuo to, kiek ir kaip dažnai perindeksuojate. Šios paslaugos " +
+				"kaina yra " + plan.priceSentence() + ", be mokesčio už tokeną.",
 		},
 		{
 			Q: "Kada embeddingų nereikia?",
@@ -150,20 +157,9 @@ func articleJSONLD(vm ArticleVM) string {
 	}
 
 	// The publisher node is what ties the article to a real organisation rather
-	// than leaving it an anonymous page on an anonymous host.
-	publisher := map[string]any{
-		"@type": "Organization",
-		"name":  vm.Contact.CompanyName,
-		"url":   vm.Contact.CompanyURL,
-		"email": vm.Contact.Email,
-		"contactPoint": map[string]any{
-			"@type":             "ContactPoint",
-			"contactType":       "sales",
-			"telephone":         vm.Contact.Phone,
-			"email":             vm.Contact.Email,
-			"availableLanguage": []string{"lt", "en"},
-		},
-	}
+	// than leaving it an anonymous page on an anonymous host. It is the same
+	// node the landing page emits as the service's provider.
+	publisher := organizationJSONLD(vm.Contact)
 
 	article := map[string]any{
 		"@type":            "TechArticle",

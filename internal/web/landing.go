@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dustin/go-humanize"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -16,11 +18,13 @@ import (
 // touches neither the key store nor the usage store, so there is no path by
 // which it could leak who holds a key or what they spend.
 type LandingServer struct {
-	model      string
-	batchMax   int
-	ratePerMin int
-	contact    Contact
-	logger     *slog.Logger
+	model       string
+	batchMax    int
+	ratePerMin  int
+	tokenBudget int64
+	plan        Plan
+	contact     Contact
+	logger      *slog.Logger
 }
 
 // Contact is how a reader reaches the operator. It travels as one value because
@@ -42,17 +46,21 @@ type Contact struct {
 
 // NewLanding builds the landing page from the gateway's own configuration, so
 // the limits it documents are the ones the gateway actually applies to a new key
-// rather than numbers copied into prose and left to rot.
-func NewLanding(model string, batchMax, ratePerMin int, contact Contact, logger *slog.Logger) *LandingServer {
+// rather than numbers copied into prose and left to rot. The published price
+// arrives the same way and for the same reason: what the page sells and what a
+// new key is issued with are one set of numbers, read from one place.
+func NewLanding(model string, batchMax, ratePerMin int, tokenBudget int64, plan Plan, contact Contact, logger *slog.Logger) *LandingServer {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &LandingServer{
-		model:      model,
-		batchMax:   batchMax,
-		ratePerMin: ratePerMin,
-		contact:    contact,
-		logger:     logger,
+		model:       model,
+		batchMax:    batchMax,
+		ratePerMin:  ratePerMin,
+		tokenBudget: tokenBudget,
+		plan:        plan,
+		contact:     contact,
+		logger:      logger,
 	}
 }
 
@@ -85,11 +93,31 @@ type LandingVM struct {
 	BaseURL    string // the address the visitor actually reached, for copy-paste curl
 	BatchMax   string
 	RatePerMin string
-	AdminPath  string
+	// TokenBudget is what a new key may spend, already in words: "neriboti" for
+	// the unlimited default, otherwise the allowance grouped for reading. The
+	// price section sells this figure, so it is read from configuration rather
+	// than asserted in markup — a page promising unlimited tokens while the
+	// gateway issues prepaid keys is the one drift that costs money.
+	TokenBudget string
+	// RatePhrase and BatchPhrase are the same two limits written as Lithuanian
+	// that agrees with its own numbers ("100 užklausų", but "21 užklausa").
+	// The limits section can get away with bare numbers under unit labels; the
+	// price section states them in sentences, where agreement is visible.
+	RatePhrase  string
+	BatchPhrase string
+	AdminPath   string
 	// Contact is who to ask for a key. There is no self-service signup, so
 	// without it the page tells a visitor to ask someone it cannot name.
-	Contact  Contact
+	Contact Contact
+	// Plan is what the key costs. It sits beside the limits above because the
+	// two answer one question — what do I get, and for how much.
+	Plan     Plan
 	Statuses []StatusVM
+	// JSONLD is the schema.org graph for this page, already serialised. It is
+	// what an AI search engine reads when it is asked what this costs, and it is
+	// built from this same view model so it cannot advertise a price the page
+	// does not show.
+	JSONLD string
 }
 
 // StatusVM is one row of the status-code contract.
@@ -102,13 +130,17 @@ type StatusVM struct {
 
 // build assembles the page for this request.
 func (s *LandingServer) build(r *http.Request) LandingVM {
-	return LandingVM{
-		Model:      s.model,
-		BaseURL:    baseURL(r),
-		BatchMax:   strconv.Itoa(s.batchMax),
-		RatePerMin: strconv.Itoa(s.ratePerMin),
-		AdminPath:  BasePath,
-		Contact:    s.contact,
+	vm := LandingVM{
+		Model:       s.model,
+		BaseURL:     baseURL(r),
+		BatchMax:    strconv.Itoa(s.batchMax),
+		RatePerMin:  strconv.Itoa(s.ratePerMin),
+		TokenBudget: tokenBudgetLabel(s.tokenBudget),
+		RatePhrase:  ratePhrase(s.ratePerMin),
+		BatchPhrase: batchPhrase(s.batchMax),
+		AdminPath:   BasePath,
+		Contact:     s.contact,
+		Plan:        s.plan,
 		Statuses: []StatusVM{
 			{Code: "200", Meaning: "Vektoriai grąžinti", Action: "—", Tone: "ok"},
 			{Code: "400", Meaning: "Netaisyklingas JSON arba per daug tekstų viename pakete", Action: "Pataisykite užklausą", Tone: "bad"},
@@ -119,6 +151,84 @@ func (s *LandingServer) build(r *http.Request) LandingVM {
 			{Code: "503", Meaning: "Užklausa nutraukta belaukiant eilėje", Action: "Pakartokite", Tone: "warn"},
 		},
 	}
+	// Built last, from the finished view model, so the structured data is a
+	// projection of the page rather than a second opinion about it.
+	vm.JSONLD = landingJSONLD(vm)
+	return vm
+}
+
+// landingJSONLD describes the service and its price as schema.org.
+//
+// The page's job is increasingly to be quoted rather than visited: somebody
+// asks an assistant what a Lithuanian embeddings API costs, and the answer is
+// only right if the price is machine-readable. An Offer carries it explicitly
+// so the figure is never inferred from prose.
+//
+// encoding/json escapes <, > and & by default. That is usually a nuisance;
+// inside a <script> block it is exactly what is wanted, since it makes it
+// impossible for any value to close the element early.
+func landingJSONLD(vm LandingVM) string {
+	provider := organizationJSONLD(vm.Contact)
+
+	// UnitPriceSpecification is what makes this a subscription rather than a
+	// one-off sale: the reference quantity of one MON (UN/CEFACT for a month)
+	// says the price recurs monthly, and valueAddedTaxIncluded says out loud
+	// that 50 € is the pre-VAT quote — the distinction a Lithuanian buyer would
+	// otherwise have to guess at.
+	priceSpec := map[string]any{
+		"@type":                 "UnitPriceSpecification",
+		"price":                 vm.Plan.PriceEUR,
+		"priceCurrency":         "EUR",
+		"valueAddedTaxIncluded": false,
+		"referenceQuantity": map[string]any{
+			"@type":    "QuantitativeValue",
+			"value":    1,
+			"unitCode": "MON",
+		},
+	}
+
+	service := map[string]any{
+		"@type":       "Service",
+		"name":        "ragembed",
+		"serviceType": "Embeddingų (vektorizavimo) API",
+		"url":         vm.BaseURL + "/",
+		"provider":    provider,
+		"areaServed":  map[string]any{"@type": "Country", "name": "Lietuva"},
+		"description": "Su OpenAI suderinamas embeddingų API, paremtas " + vm.Model +
+			" modeliu ir veikiantis operatoriaus infrastruktūroje.",
+		"offers": map[string]any{
+			"@type":              "Offer",
+			"price":              vm.Plan.PriceEUR,
+			"priceCurrency":      "EUR",
+			"url":                vm.BaseURL + "/#kaina",
+			"availability":       "https://schema.org/InStock",
+			"priceSpecification": priceSpec,
+		},
+	}
+
+	graph := map[string]any{
+		"@context": "https://schema.org",
+		"@graph":   []any{service, provider},
+	}
+
+	out, err := json.Marshal(graph)
+	if err != nil {
+		// Every value here is a plain string, int or map thereof, so this cannot
+		// fail; dropping the block is still better than emitting broken markup.
+		return ""
+	}
+	return string(out)
+}
+
+// tokenBudgetLabel puts a key's token allowance into the words the price
+// section uses. -1 is the unlimited default the plan is sold on; anything
+// positive is a prepaid allowance, grouped so a nine-digit number can be read
+// at a glance rather than counted digit by digit.
+func tokenBudgetLabel(budget int64) string {
+	if budget < 0 {
+		return "neriboti"
+	}
+	return humanize.Comma(budget)
 }
 
 // baseURL reconstructs the address the visitor used, so the curl examples are
@@ -138,6 +248,27 @@ func baseURL(r *http.Request) string {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host
+}
+
+// organizationJSONLD builds the schema.org Organization node for the operator.
+// Both public pages emit it — the article as the publisher of the text, the
+// landing page as the provider of the service — and they must describe the same
+// organisation to the same crawler, so the node is built once here rather than
+// written out twice and left to diverge.
+func organizationJSONLD(c Contact) map[string]any {
+	return map[string]any{
+		"@type": "Organization",
+		"name":  c.CompanyName,
+		"url":   c.CompanyURL,
+		"email": c.Email,
+		"contactPoint": map[string]any{
+			"@type":             "ContactPoint",
+			"contactType":       "sales",
+			"telephone":         c.Phone,
+			"email":             c.Email,
+			"availableLanguage": []string{"lt", "en"},
+		},
+	}
 }
 
 // NewContact assembles the published contact details. The phone is stored twice
