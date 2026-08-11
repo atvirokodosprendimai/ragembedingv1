@@ -8,9 +8,15 @@ package web
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-// Landing is the public API documentation page. It carries no client-side
-// runtime at all — no datastar, no fetches — because its entire job is to be
-// readable the instant it arrives; there is nothing here to make reactive.
+// Landing is the public API documentation page, in Lithuanian: the service is
+// run for a Lithuanian audience, and the people who ask for a key read the page
+// before they read the code. It carries no client-side runtime at all — no
+// datastar, no fetches — because its entire job is to be readable the instant it
+// arrives; there is nothing here to make reactive.
+//
+// The prose is translated; the code samples, HTTP headers and status numbers are
+// not. Those are the parts a developer copies verbatim, and translating them
+// would break them.
 func Landing(vm LandingVM) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -32,105 +38,131 @@ func Landing(vm LandingVM) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>ragembed · embeddings API</title><meta name=\"description\" content=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"lt\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>ragembed · embeddingų API lietuviškiems tekstams</title><meta name=\"description\" content=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue("OpenAI-compatible " + vm.Model + " embeddings API. Bring your API key and POST your text.")
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue("OpenAI suderinamas embeddingų API su " + vm.Model + " modeliu. Jūsų serveriuose, su savo raktu ir limitais — tekstai neišeina iš jūsų infrastruktūros.")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 15, Col: 105}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 21, Col: 176}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><link rel=\"stylesheet\" href=\"/assets/landing.css\"></head><body><div class=\"page\"><header class=\"top\"><div class=\"brand\"><span class=\"prompt\" aria-hidden=\"true\">▉</span> <span class=\"brand-name\">ragembed</span></div><span class=\"chip\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><link rel=\"canonical\" href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Model)
+		var templ_7745c5c3_Var3 templ.SafeURL
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(vm.BaseURL + "/"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 26, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 23, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</span></header><main><section class=\"hero\"><h1>Text in, vectors out.</h1><p class=\"lede\">An OpenAI-compatible embeddings API over <b>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><meta property=\"og:type\" content=\"website\"><meta property=\"og:title\" content=\"ragembed · embeddingų API lietuviškiems tekstams\"><meta property=\"og:description\" content=\"OpenAI suderinamas embeddingų API. Tekstai neišeina iš jūsų infrastruktūros.\"><meta property=\"og:url\" content=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Model)
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(vm.BaseURL + "/")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 32, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 30, Col: 53}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</b>. Point any OpenAI client at it, send a batch, get your vectors back. Your key carries its own limits and its own token budget.</p><div class=\"endpoint\" role=\"group\" aria-label=\"Base URL\"><span class=\"endpoint-label\">base url</span> <code class=\"endpoint-url\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"><meta property=\"og:locale\" content=\"lt_LT\"><link rel=\"stylesheet\" href=\"/assets/landing.css\"></head><body><div class=\"page\"><header class=\"top\"><div class=\"brand\"><span class=\"prompt\" aria-hidden=\"true\">▉</span> <span class=\"brand-name\">ragembed</span></div><span class=\"chip\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(vm.BaseURL)
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Model)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 38, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 41, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</code></div></section><section aria-labelledby=\"quickstart\"><h2 id=\"quickstart\"><span class=\"tick\">01</span> Quickstart</h2><p>One request, one vector. Swap in the key your operator issued you.</p>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = code(`curl `+vm.BaseURL+`/v1/embeddings \
-  -H "Authorization: Bearer sk-rag-…" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"`+vm.Model+`","input":"hello world"}'`).Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</section><section aria-labelledby=\"batching\"><h2 id=\"batching\"><span class=\"tick\">02</span> Batching</h2><p>Send an array to embed up to <b>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</span></header><main><section class=\"hero\"><h1>Tekstas įeina, vektoriai išeina.</h1><p class=\"lede\">Su OpenAI suderinamas embeddingų API, paremtas <b>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(vm.BatchMax)
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Model)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 52, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 47, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</b> texts in one call — far faster than one request each. Over that limit the request is refused with <code>400</code> rather than silently truncated.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</b> modeliu. Nukreipkite bet kurį OpenAI klientą į šį adresą, siųskite tekstų paketą ir atgausite vektorius. Jūsų raktas turi savo limitus ir savo tokenų biudžetą.</p><div class=\"endpoint\" role=\"group\" aria-label=\"Bazinis adresas\"><span class=\"endpoint-label\">bazinis adresas</span> <code class=\"endpoint-url\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(vm.BaseURL)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 54, Col: 46}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</code></div></section><section aria-labelledby=\"pradzia\"><h2 id=\"pradzia\"><span class=\"tick\">01</span> Greita pradžia</h2><p>Viena užklausa, vienas vektorius. Įrašykite raktą, kurį jums išdavė operatorius.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		templ_7745c5c3_Err = code(`curl `+vm.BaseURL+`/v1/embeddings \
   -H "Authorization: Bearer sk-rag-…" \
   -H "Content-Type: application/json" \
-  -d '{"model":"`+vm.Model+`","input":["first text","second text","third text"]}'`).Render(ctx, templ_7745c5c3_Buffer)
+  -d '{"model":"`+vm.Model+`","input":"labas rytas"}'`).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<p class=\"note\">Vectors come back in <b>the same order you sent them</b>, so you can zip them straight back onto your rows.</p></section><section aria-labelledby=\"native\"><h2 id=\"native\"><span class=\"tick\">03</span> Ollama's native endpoint</h2><p>If your client speaks Ollama rather than OpenAI, use <code>/api/embed</code>. Same key, same limits, same batching — only the response shape differs.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</section><section aria-labelledby=\"paketai\"><h2 id=\"paketai\"><span class=\"tick\">02</span> Paketinis apdorojimas</h2><p>Siųskite masyvą ir apdorosite iki <b>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var8 string
+		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(vm.BatchMax)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 68, Col: 59}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</b> tekstų viena užklausa — daug greičiau nei po vieną. Viršijus limitą užklausa atmetama su <code>400</code>, o ne tyliai apkarpoma.</p>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = code(`curl `+vm.BaseURL+`/v1/embeddings \
+  -H "Authorization: Bearer sk-rag-…" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"`+vm.Model+`","input":["pirmas tekstas","antras tekstas","trečias tekstas"]}'`).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<p class=\"note\">Vektoriai grįžta <b>ta pačia tvarka, kuria juos išsiuntėte</b>, todėl galite iš karto priskirti juos savo įrašams.</p></section><section aria-labelledby=\"native\"><h2 id=\"native\"><span class=\"tick\">03</span> Natyvus Ollama adresas</h2><p>Jei jūsų klientas kalba su Ollama, o ne su OpenAI, naudokite <code>/api/embed</code>. Tas pats raktas, tie patys limitai, tie patys paketai — skiriasi tik atsakymo struktūra.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		templ_7745c5c3_Err = code(`curl `+vm.BaseURL+`/api/embed \
   -H "Authorization: Bearer sk-rag-…" \
   -H "Content-Type: application/json" \
-  -d '{"model":"`+vm.Model+`","input":["first text","second text"]}'`).Render(ctx, templ_7745c5c3_Buffer)
+  -d '{"model":"`+vm.Model+`","input":["pirmas tekstas","antras tekstas"]}'`).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</section><section aria-labelledby=\"sdk\"><h2 id=\"sdk\"><span class=\"tick\">04</span> From the OpenAI SDK</h2><p>No special client needed — set the base URL and carry on.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</section><section aria-labelledby=\"sdk\"><h2 id=\"sdk\"><span class=\"tick\">04</span> Su OpenAI SDK</h2><p>Atskiro kliento nereikia — pakeiskite bazinį adresą ir dirbkite toliau.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -138,177 +170,190 @@ func Landing(vm LandingVM) templ.Component {
 
 client = OpenAI(base_url="`+vm.BaseURL+`/v1", api_key="sk-rag-…")
 
-vectors = client.embeddings.create(
+vektoriai = client.embeddings.create(
     model="`+vm.Model+`",
-    input=["first text", "second text"],
+    input=["pirmas tekstas", "antras tekstas"],
 )
-print(len(vectors.data), "vectors")`).Render(ctx, templ_7745c5c3_Buffer)
+print(len(vektoriai.data), "vektoriai")`).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</section><section aria-labelledby=\"limits\"><h2 id=\"limits\"><span class=\"tick\">05</span> What your key allows</h2><div class=\"limits\"><div class=\"limit\"><dt>batch</dt><dd>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</section><section aria-labelledby=\"limitai\"><h2 id=\"limitai\"><span class=\"tick\">05</span> Ką leidžia jūsų raktas</h2><div class=\"limits\"><div class=\"limit\"><dt>paketas</dt><dd>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(vm.BatchMax)
+		var templ_7745c5c3_Var9 string
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(vm.BatchMax)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 94, Col: 25}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 111, Col: 25}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, " <span class=\"unit\">inputs / request</span></dd></div><div class=\"limit\"><dt>rate</dt><dd>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(vm.RatePerMin)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 98, Col: 27}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " <span class=\"unit\">tekstai / užklausa</span></dd></div><div class=\"limit\"><dt>dažnis</dt><dd>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, " <span class=\"unit\">requests / min</span></dd></div><div class=\"limit\"><dt>budget</dt><dd>per key <span class=\"unit\">tokens</span></dd></div></div><p class=\"note\">Those are the defaults a new key is issued with; yours may differ — your operator sets them per key. Every response to a budgeted key carries <code>X-Token-Budget-Remaining</code>, so you can watch your own consumption without asking anyone.</p></section><section aria-labelledby=\"waiting\"><h2 id=\"waiting\"><span class=\"tick\">06</span> When the pool is busy</h2><p>Requests are queued, not dropped. Under load your call waits for a free slot instead of failing, so a burst shows up as latency rather than errors — no retry storm needed. Nobody is starved: a request that has been waiting is promoted ahead of higher-priority traffic.</p></section><section aria-labelledby=\"statuses\"><h2 id=\"statuses\"><span class=\"tick\">07</span> What the statuses mean</h2><div class=\"table-scroll\"><table class=\"statuses\"><thead><tr><th scope=\"col\">Code</th><th scope=\"col\">Meaning</th><th scope=\"col\">What to do</th></tr></thead> <tbody>")
+		var templ_7745c5c3_Var10 string
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(vm.RatePerMin)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 115, Col: 27}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, " <span class=\"unit\">užklausos / min.</span></dd></div><div class=\"limit\"><dt>biudžetas</dt><dd>pagal raktą <span class=\"unit\">tokenai</span></dd></div></div><p class=\"note\">Tai numatytieji limitai naujam raktui; jūsų gali skirtis — juos nustato operatorius kiekvienam raktui atskirai. Kiekvienas atsakymas raktui su biudžetu turi <code>X-Token-Budget-Remaining</code> antraštę, todėl savo sunaudojimą matote patys, nieko neklausdami.</p></section><section aria-labelledby=\"apkrova\"><h2 id=\"apkrova\"><span class=\"tick\">06</span> Kai serveris apkrautas</h2><p>Užklausos rikiuojamos į eilę, o ne atmetamos. Esant apkrovai jūsų užklausa laukia laisvos vietos, o ne krenta su klaida — staigus srautas virsta ilgesniu atsakymo laiku, o ne klaidų lavina, todėl kartoti užklausų nereikia. Niekas nelieka pamirštas: ilgiau laukusi užklausa praleidžiama pirmiau už aukštesnio prioriteto srautą.</p></section><section aria-labelledby=\"kodai\"><h2 id=\"kodai\"><span class=\"tick\">07</span> Ką reiškia atsakymų kodai</h2><div class=\"table-scroll\"><table class=\"statuses\"><thead><tr><th scope=\"col\">Kodas</th><th scope=\"col\">Reikšmė</th><th scope=\"col\">Ką daryti</th></tr></thead> <tbody>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, s := range vm.Statuses {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<tr><th scope=\"row\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<tr><th scope=\"row\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var9 = []any{"code", s.Tone}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var9...)
+			var templ_7745c5c3_Var11 = []any{"code", s.Tone}
+			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var11...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<span class=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var10 string
-			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var9).String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 1, Col: 0}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var11 string
-			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(s.Code)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 135, Col: 66}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</span></th><td>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<span class=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var12 string
-			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(s.Meaning)
+			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var11).String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 136, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 1, Col: 0}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</td><td class=\"dim\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var13 string
-			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(s.Action)
+			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(s.Code)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 137, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 153, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</td></tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</span></th><td>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var14 string
+			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(s.Meaning)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 154, Col: 26}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</td><td class=\"dim\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var15 string
+			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(s.Action)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 155, Col: 37}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</td></tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</tbody></table></div><p class=\"note\">Errors use the OpenAI envelope (<code>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var14 string
-		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(`{"error":{"message","type"}}`)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 145, Col: 46}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</code>), so an OpenAI SDK surfaces them through its normal error handling.</p></section><section aria-labelledby=\"getkey\"><h2 id=\"getkey\"><span class=\"tick\">08</span> Getting a key</h2><p>Keys are issued by the operator — there is no self-service signup. Email us and say roughly how much you expect to embed, so your batch, rate and budget can be set sensibly.</p><p><a class=\"mailto\" href=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var15 templ.SafeURL
-		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("mailto:" + vm.ContactEmail + "?subject=ragembed%20API%20key"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 157, Col: 108}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\"><span class=\"tick\" aria-hidden=\"true\">✉</span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</tbody></table></div><p class=\"note\">Klaidos grąžinamos OpenAI formatu (<code>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(vm.ContactEmail)
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(`{"error":{"message","type"}}`)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 159, Col: 25}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 163, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</a></p><p class=\"note\">Keep the key secret: only its hash is stored here, so a lost key cannot be recovered, only replaced.</p></section></main><footer class=\"foot\"><span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</code>), todėl OpenAI SDK apdoroja jas įprastu būdu.</p></section><section aria-labelledby=\"raktas\"><h2 id=\"raktas\"><span class=\"tick\">08</span> Kaip gauti raktą</h2><p>Raktus išduoda operatorius — savitarnos registracijos nėra. Parašykite mums ir trumpai nurodykite, kiek maždaug tekstų planuojate apdoroti, kad paketo, dažnio ir biudžeto limitai būtų nustatyti prasmingai.</p><p><a class=\"mailto\" href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var17 string
-		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Model)
+		var templ_7745c5c3_Var17 templ.SafeURL
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("mailto:" + vm.ContactEmail + "?subject=ragembed%20API%20raktas"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 169, Col: 21}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 175, Col: 111}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, " embeddings · tokens metered from the model's own count</span> <a class=\"admin-link\" href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\"><span class=\"tick\" aria-hidden=\"true\">✉</span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var18 templ.SafeURL
-		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(vm.AdminPath))
+		var templ_7745c5c3_Var18 string
+		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(vm.ContactEmail)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 170, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 177, Col: 25}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\">operator dashboard →</a></footer></div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</a></p><p class=\"note\">Raktą laikykite paslaptyje: saugoma tik jo maiša (hash), todėl pamesto rakto atkurti neįmanoma — tik išduoti naują.</p></section><section aria-labelledby=\"daugiau\"><h2 id=\"daugiau\"><span class=\"tick\">09</span> Nesate tikri, ar jums to reikia?</h2><p>Parašėme išsamų straipsnį apie tai, kas yra embeddingai, kada jų verta imtis, kada tikrai neverta, ir ką daryti su asmens duomenimis pagal BDAR.</p><p><a class=\"mailto\" href=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var19 templ.SafeURL
+		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(articlePath))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 193, Col: 58}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\"><span class=\"tick\" aria-hidden=\"true\">→</span> Kada jūsų įmonei reikia embeddingų API</a></p></section></main><footer class=\"foot\"><span>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var20 string
+		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Model)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 201, Col: 21}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, " embeddingai · tokenai skaičiuojami pagal paties modelio ataskaitą</span> <a class=\"admin-link\" href=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var21 templ.SafeURL
+		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(vm.AdminPath))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 202, Col: 61}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\">operatoriaus skydelis →</a></footer></div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -334,25 +379,25 @@ func code(body string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var19 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var19 == nil {
-			templ_7745c5c3_Var19 = templ.NopComponent
+		templ_7745c5c3_Var22 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var22 == nil {
+			templ_7745c5c3_Var22 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div class=\"code-scroll\"><pre><code>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<div class=\"code-scroll\"><pre><code>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var20 string
-		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(body)
+		var templ_7745c5c3_Var23 string
+		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(body)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 181, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/landing.templ`, Line: 213, Col: 19}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</code></pre></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</code></pre></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

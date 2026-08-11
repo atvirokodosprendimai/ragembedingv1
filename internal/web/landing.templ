@@ -1,19 +1,34 @@
 package web
 
-// Landing is the public API documentation page. It carries no client-side
-// runtime at all — no datastar, no fetches — because its entire job is to be
-// readable the instant it arrives; there is nothing here to make reactive.
+// Landing is the public API documentation page, in Lithuanian: the service is
+// run for a Lithuanian audience, and the people who ask for a key read the page
+// before they read the code. It carries no client-side runtime at all — no
+// datastar, no fetches — because its entire job is to be readable the instant it
+// arrives; there is nothing here to make reactive.
+//
+// The prose is translated; the code samples, HTTP headers and status numbers are
+// not. Those are the parts a developer copies verbatim, and translating them
+// would break them.
 templ Landing(vm LandingVM) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang="lt">
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<title>ragembed · embeddings API</title>
+			<title>ragembed · embeddingų API lietuviškiems tekstams</title>
 			<meta
 				name="description"
-				content={ "OpenAI-compatible " + vm.Model + " embeddings API. Bring your API key and POST your text." }
+				content={ "OpenAI suderinamas embeddingų API su " + vm.Model + " modeliu. Jūsų serveriuose, su savo raktu ir limitais — tekstai neišeina iš jūsų infrastruktūros." }
 			/>
+			<link rel="canonical" href={ templ.SafeURL(vm.BaseURL + "/") }/>
+			<meta property="og:type" content="website"/>
+			<meta property="og:title" content="ragembed · embeddingų API lietuviškiems tekstams"/>
+			<meta
+				property="og:description"
+				content="OpenAI suderinamas embeddingų API. Tekstai neišeina iš jūsų infrastruktūros."
+			/>
+			<meta property="og:url" content={ vm.BaseURL + "/" }/>
+			<meta property="og:locale" content="lt_LT"/>
 			<link rel="stylesheet" href="/assets/landing.css"/>
 		</head>
 		<body>
@@ -27,106 +42,109 @@ templ Landing(vm LandingVM) {
 				</header>
 				<main>
 					<section class="hero">
-						<h1>Text in, vectors out.</h1>
+						<h1>Tekstas įeina, vektoriai išeina.</h1>
 						<p class="lede">
-							An OpenAI-compatible embeddings API over <b>{ vm.Model }</b>. Point any
-							OpenAI client at it, send a batch, get your vectors back. Your key
-							carries its own limits and its own token budget.
+							Su OpenAI suderinamas embeddingų API, paremtas <b>{ vm.Model }</b> modeliu.
+							Nukreipkite bet kurį OpenAI klientą į šį adresą, siųskite tekstų paketą
+							ir atgausite vektorius. Jūsų raktas turi savo limitus ir savo tokenų
+							biudžetą.
 						</p>
-						<div class="endpoint" role="group" aria-label="Base URL">
-							<span class="endpoint-label">base url</span>
+						<div class="endpoint" role="group" aria-label="Bazinis adresas">
+							<span class="endpoint-label">bazinis adresas</span>
 							<code class="endpoint-url">{ vm.BaseURL }</code>
 						</div>
 					</section>
-					<section aria-labelledby="quickstart">
-						<h2 id="quickstart"><span class="tick">01</span> Quickstart</h2>
-						<p>One request, one vector. Swap in the key your operator issued you.</p>
+					<section aria-labelledby="pradzia">
+						<h2 id="pradzia"><span class="tick">01</span> Greita pradžia</h2>
+						<p>Viena užklausa, vienas vektorius. Įrašykite raktą, kurį jums išdavė operatorius.</p>
 						@code(`curl ` + vm.BaseURL + `/v1/embeddings \
   -H "Authorization: Bearer sk-rag-…" \
   -H "Content-Type: application/json" \
-  -d '{"model":"` + vm.Model + `","input":"hello world"}'`)
+  -d '{"model":"` + vm.Model + `","input":"labas rytas"}'`)
 					</section>
-					<section aria-labelledby="batching">
-						<h2 id="batching"><span class="tick">02</span> Batching</h2>
+					<section aria-labelledby="paketai">
+						<h2 id="paketai"><span class="tick">02</span> Paketinis apdorojimas</h2>
 						<p>
-							Send an array to embed up to <b>{ vm.BatchMax }</b> texts in one call —
-							far faster than one request each. Over that limit the request is
-							refused with <code>400</code> rather than silently truncated.
+							Siųskite masyvą ir apdorosite iki <b>{ vm.BatchMax }</b> tekstų viena
+							užklausa — daug greičiau nei po vieną. Viršijus limitą užklausa
+							atmetama su <code>400</code>, o ne tyliai apkarpoma.
 						</p>
 						@code(`curl ` + vm.BaseURL + `/v1/embeddings \
   -H "Authorization: Bearer sk-rag-…" \
   -H "Content-Type: application/json" \
-  -d '{"model":"` + vm.Model + `","input":["first text","second text","third text"]}'`)
+  -d '{"model":"` + vm.Model + `","input":["pirmas tekstas","antras tekstas","trečias tekstas"]}'`)
 						<p class="note">
-							Vectors come back in <b>the same order you sent them</b>, so you can zip
-							them straight back onto your rows.
+							Vektoriai grįžta <b>ta pačia tvarka, kuria juos išsiuntėte</b>, todėl
+							galite iš karto priskirti juos savo įrašams.
 						</p>
 					</section>
 					<section aria-labelledby="native">
-						<h2 id="native"><span class="tick">03</span> Ollama's native endpoint</h2>
+						<h2 id="native"><span class="tick">03</span> Natyvus Ollama adresas</h2>
 						<p>
-							If your client speaks Ollama rather than OpenAI, use <code>/api/embed</code>.
-							Same key, same limits, same batching — only the response shape differs.
+							Jei jūsų klientas kalba su Ollama, o ne su OpenAI, naudokite
+							<code>/api/embed</code>. Tas pats raktas, tie patys limitai, tie patys
+							paketai — skiriasi tik atsakymo struktūra.
 						</p>
 						@code(`curl ` + vm.BaseURL + `/api/embed \
   -H "Authorization: Bearer sk-rag-…" \
   -H "Content-Type: application/json" \
-  -d '{"model":"` + vm.Model + `","input":["first text","second text"]}'`)
+  -d '{"model":"` + vm.Model + `","input":["pirmas tekstas","antras tekstas"]}'`)
 					</section>
 					<section aria-labelledby="sdk">
-						<h2 id="sdk"><span class="tick">04</span> From the OpenAI SDK</h2>
-						<p>No special client needed — set the base URL and carry on.</p>
+						<h2 id="sdk"><span class="tick">04</span> Su OpenAI SDK</h2>
+						<p>Atskiro kliento nereikia — pakeiskite bazinį adresą ir dirbkite toliau.</p>
 						@code(`from openai import OpenAI
 
 client = OpenAI(base_url="` + vm.BaseURL + `/v1", api_key="sk-rag-…")
 
-vectors = client.embeddings.create(
+vektoriai = client.embeddings.create(
     model="` + vm.Model + `",
-    input=["first text", "second text"],
+    input=["pirmas tekstas", "antras tekstas"],
 )
-print(len(vectors.data), "vectors")`)
+print(len(vektoriai.data), "vektoriai")`)
 					</section>
-					<section aria-labelledby="limits">
-						<h2 id="limits"><span class="tick">05</span> What your key allows</h2>
+					<section aria-labelledby="limitai">
+						<h2 id="limitai"><span class="tick">05</span> Ką leidžia jūsų raktas</h2>
 						<div class="limits">
 							<div class="limit">
-								<dt>batch</dt>
-								<dd>{ vm.BatchMax } <span class="unit">inputs / request</span></dd>
+								<dt>paketas</dt>
+								<dd>{ vm.BatchMax } <span class="unit">tekstai / užklausa</span></dd>
 							</div>
 							<div class="limit">
-								<dt>rate</dt>
-								<dd>{ vm.RatePerMin } <span class="unit">requests / min</span></dd>
+								<dt>dažnis</dt>
+								<dd>{ vm.RatePerMin } <span class="unit">užklausos / min.</span></dd>
 							</div>
 							<div class="limit">
-								<dt>budget</dt>
-								<dd>per key <span class="unit">tokens</span></dd>
+								<dt>biudžetas</dt>
+								<dd>pagal raktą <span class="unit">tokenai</span></dd>
 							</div>
 						</div>
 						<p class="note">
-							Those are the defaults a new key is issued with; yours may differ —
-							your operator sets them per key. Every response to a budgeted key
-							carries <code>X-Token-Budget-Remaining</code>, so you can watch your
-							own consumption without asking anyone.
+							Tai numatytieji limitai naujam raktui; jūsų gali skirtis — juos nustato
+							operatorius kiekvienam raktui atskirai. Kiekvienas atsakymas raktui su
+							biudžetu turi <code>X-Token-Budget-Remaining</code> antraštę, todėl
+							savo sunaudojimą matote patys, nieko neklausdami.
 						</p>
 					</section>
-					<section aria-labelledby="waiting">
-						<h2 id="waiting"><span class="tick">06</span> When the pool is busy</h2>
+					<section aria-labelledby="apkrova">
+						<h2 id="apkrova"><span class="tick">06</span> Kai serveris apkrautas</h2>
 						<p>
-							Requests are queued, not dropped. Under load your call waits for a free
-							slot instead of failing, so a burst shows up as latency rather than
-							errors — no retry storm needed. Nobody is starved: a request that has
-							been waiting is promoted ahead of higher-priority traffic.
+							Užklausos rikiuojamos į eilę, o ne atmetamos. Esant apkrovai jūsų
+							užklausa laukia laisvos vietos, o ne krenta su klaida — staigus
+							srautas virsta ilgesniu atsakymo laiku, o ne klaidų lavina, todėl
+							kartoti užklausų nereikia. Niekas nelieka pamirštas: ilgiau laukusi
+							užklausa praleidžiama pirmiau už aukštesnio prioriteto srautą.
 						</p>
 					</section>
-					<section aria-labelledby="statuses">
-						<h2 id="statuses"><span class="tick">07</span> What the statuses mean</h2>
+					<section aria-labelledby="kodai">
+						<h2 id="kodai"><span class="tick">07</span> Ką reiškia atsakymų kodai</h2>
 						<div class="table-scroll">
 							<table class="statuses">
 								<thead>
 									<tr>
-										<th scope="col">Code</th>
-										<th scope="col">Meaning</th>
-										<th scope="col">What to do</th>
+										<th scope="col">Kodas</th>
+										<th scope="col">Reikšmė</th>
+										<th scope="col">Ką daryti</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -141,33 +159,47 @@ print(len(vectors.data), "vectors")`)
 							</table>
 						</div>
 						<p class="note">
-							Errors use the OpenAI envelope
-							(<code>{ `{"error":{"message","type"}}` }</code>), so an OpenAI SDK
-							surfaces them through its normal error handling.
+							Klaidos grąžinamos OpenAI formatu
+							(<code>{ `{"error":{"message","type"}}` }</code>), todėl OpenAI SDK
+							apdoroja jas įprastu būdu.
 						</p>
 					</section>
-					<section aria-labelledby="getkey">
-						<h2 id="getkey"><span class="tick">08</span> Getting a key</h2>
+					<section aria-labelledby="raktas">
+						<h2 id="raktas"><span class="tick">08</span> Kaip gauti raktą</h2>
 						<p>
-							Keys are issued by the operator — there is no self-service signup.
-							Email us and say roughly how much you expect to embed, so your batch,
-							rate and budget can be set sensibly.
+							Raktus išduoda operatorius — savitarnos registracijos nėra. Parašykite
+							mums ir trumpai nurodykite, kiek maždaug tekstų planuojate apdoroti,
+							kad paketo, dažnio ir biudžeto limitai būtų nustatyti prasmingai.
 						</p>
 						<p>
-							<a class="mailto" href={ templ.SafeURL("mailto:" + vm.ContactEmail + "?subject=ragembed%20API%20key") }>
+							<a class="mailto" href={ templ.SafeURL("mailto:" + vm.ContactEmail + "?subject=ragembed%20API%20raktas") }>
 								<span class="tick" aria-hidden="true">✉</span>
 								{ vm.ContactEmail }
 							</a>
 						</p>
 						<p class="note">
-							Keep the key secret: only its hash is stored here, so a lost key
-							cannot be recovered, only replaced.
+							Raktą laikykite paslaptyje: saugoma tik jo maiša (hash), todėl pamesto
+							rakto atkurti neįmanoma — tik išduoti naują.
+						</p>
+					</section>
+					<section aria-labelledby="daugiau">
+						<h2 id="daugiau"><span class="tick">09</span> Nesate tikri, ar jums to reikia?</h2>
+						<p>
+							Parašėme išsamų straipsnį apie tai, kas yra embeddingai, kada jų verta
+							imtis, kada tikrai neverta, ir ką daryti su asmens duomenimis pagal
+							BDAR.
+						</p>
+						<p>
+							<a class="mailto" href={ templ.SafeURL(articlePath) }>
+								<span class="tick" aria-hidden="true">→</span>
+								Kada jūsų įmonei reikia embeddingų API
+							</a>
 						</p>
 					</section>
 				</main>
 				<footer class="foot">
-					<span>{ vm.Model } embeddings · tokens metered from the model's own count</span>
-					<a class="admin-link" href={ templ.SafeURL(vm.AdminPath) }>operator dashboard →</a>
+					<span>{ vm.Model } embeddingai · tokenai skaičiuojami pagal paties modelio ataskaitą</span>
+					<a class="admin-link" href={ templ.SafeURL(vm.AdminPath) }>operatoriaus skydelis →</a>
 				</footer>
 			</div>
 		</body>

@@ -135,7 +135,9 @@ the key you are watching streams, which is the point of an actor per key.
 
 | Path | Who | What |
 |------|-----|------|
-| `/` | public | Landing page: how to call the API, with copy-paste curl for both endpoints, the real configured limits and the status-code contract |
+| `/` | public | Landing page (Lithuanian): how to call the API, copy-paste curl for both endpoints, the real configured limits and the status-code contract |
+| `/kada-reikia-embeddingu-api` | public | Long-form article: when this service is worth it, when it is not, GDPR, cost, Lithuanian support. See `docs/seo.md` |
+| `/robots.txt`, `/sitemap.xml`, `/llms.txt` | public | Crawler and assistant discovery |
 | `/admin` | operator | Usage dashboard, behind Basic auth |
 | `/healthz` | public | Liveness probe |
 
@@ -194,7 +196,8 @@ internal/queue     priority admission queue in front of the pool
 internal/live      CQRS read side: one goroutine per watched key
 internal/proxy     /v1/embeddings enforcement pipeline + forwarder
 internal/httpapi   chi router + Bearer-auth middleware
-internal/web       datastar/templ dashboard (/admin) + public landing page (/)
+internal/web       datastar/templ dashboard (/admin) + public LT pages (/)
+docs/seo.md        search-intent strategy behind the public pages
 internal/platform/database  GORM + no-cgo SQLite + repositories
 migrations/        goose SQL migrations (embedded)
 caddy/Caddyfile    load balancer for the 10 Ollama backends

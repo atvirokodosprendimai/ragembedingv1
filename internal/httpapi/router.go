@@ -63,8 +63,9 @@ func (rt Router) Handler() http.Handler {
 	// root so a client who pastes the gateway's address into a browser lands on
 	// documentation rather than a 404 or, worse, the operator's dashboard.
 	if rt.Landing != nil {
-		r.Method(http.MethodGet, "/", rt.Landing)
-		r.Method(http.MethodGet, "/assets/landing.css", rt.Landing)
+		for _, path := range web.PublicPaths {
+			r.Method(http.MethodGet, path, rt.Landing)
+		}
 	}
 
 	// Operator dashboard, mounted under /admin and entirely behind Basic auth.
