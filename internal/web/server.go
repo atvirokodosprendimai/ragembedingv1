@@ -27,11 +27,13 @@ import (
 //go:embed static/dashboard.css static/landing.css
 var assets embed.FS
 
-// poolReporter is the dashboard's read-only view of the admission queue. It is
-// declared at the consumer so the dashboard depends on "tell me the pressure"
-// and nothing else — it can neither admit nor release.
+// poolReporter is the dashboard's read-only view of the admission queue: report
+// the pressure, and say when it changes. It is declared at the consumer so the
+// dashboard depends on those two capabilities and nothing else — it can neither
+// admit nor release.
 type poolReporter interface {
 	Stats() queue.Stats
+	Watch() (<-chan struct{}, func())
 }
 
 // liveHub is the read side the dashboard streams from: subscribe to a key and
@@ -41,11 +43,18 @@ type liveHub interface {
 	Subscribe(ctx context.Context, keyID uint) (<-chan live.Snapshot, func())
 }
 
-// queueInterval is how often the live stream repaints the pool-pressure strip.
-// The queue changes continuously and has no change events to subscribe to, so
-// the server picks the cadence — and being the server's choice, it can be tuned
-// without touching a single line of markup.
-const queueInterval = 5 * time.Second
+// The pool strip repaints on two triggers, both the server's choice.
+const (
+	// queueHeartbeat repaints even when nothing has changed, so the elapsed
+	// figures ("oldest 3.2s") keep counting while a request sits queued.
+	queueHeartbeat = time.Second
+	// queueMinInterval is the floor between two change-driven repaints. Under
+	// load the queue changes on every admission and release — hundreds a second
+	// — and a display that redraws that fast is illegible as well as wasteful.
+	// Changes inside the window are coalesced into one repaint at its end, so
+	// nothing is lost, only merged.
+	queueMinInterval = 100 * time.Millisecond
+)
 
 // Server renders the operator usage dashboard over the key and usage stores. It
 // is read-only: it reports what keys exist, how many bge-m3 tokens each has
@@ -192,13 +201,37 @@ func (s *Server) handleKeyLive(w http.ResponseWriter, r *http.Request) {
 	snapshots, unsubscribe := s.hub.Subscribe(r.Context(), keyID)
 	defer unsubscribe()
 
+	// Watch the queue itself rather than sampling it: a request that queues up
+	// appears on screen as it happens, not on the next tick.
+	changes, unwatch := s.pool.Watch()
+	defer unwatch()
+
 	sse := datastar.NewSSE(w, r)
-	ticker := time.NewTicker(queueInterval)
-	defer ticker.Stop()
+
+	heartbeat := time.NewTicker(queueHeartbeat)
+	defer heartbeat.Stop()
+
+	// cooldown enforces queueMinInterval between change-driven repaints. It is
+	// created stopped: it only runs during the window after a repaint.
+	cooldown := time.NewTimer(queueMinInterval)
+	if !cooldown.Stop() {
+		<-cooldown.C
+	}
+	defer cooldown.Stop()
+
+	var throttled, missed bool
+	paintQueue := func() bool {
+		if err := sse.PatchElementTempl(QueuePanel(buildQueue(s.pool.Stats()))); err != nil {
+			return false
+		}
+		throttled, missed = true, false
+		cooldown.Reset(queueMinInterval)
+		return true
+	}
 
 	// Paint the pressure strip immediately so the first frame is not empty; the
 	// key detail arrives from the hub's priming snapshot a moment later.
-	if err := sse.PatchElementTempl(QueuePanel(buildQueue(s.pool.Stats()))); err != nil {
+	if !paintQueue() {
 		return
 	}
 
@@ -209,7 +242,26 @@ func (s *Server) handleKeyLive(w http.ResponseWriter, r *http.Request) {
 			// down. Returning runs the deferred unsubscribe.
 			return
 
-		case <-ticker.C:
+		case <-changes:
+			if throttled {
+				// Inside the cooldown: remember that something moved and repaint
+				// once when it expires, so a burst becomes one frame.
+				missed = true
+				continue
+			}
+			if !paintQueue() {
+				return
+			}
+
+		case <-cooldown.C:
+			throttled = false
+			if missed && !paintQueue() {
+				return
+			}
+
+		case <-heartbeat.C:
+			// Nothing may have changed, but "oldest 3.2s" is a clock: it has to
+			// keep moving while a request waits.
 			if err := sse.PatchElementTempl(QueuePanel(buildQueue(s.pool.Stats()))); err != nil {
 				return
 			}
