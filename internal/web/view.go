@@ -13,6 +13,22 @@ import (
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/queue"
 )
 
+// BasePath is where the operator dashboard is mounted. Every URL the dashboard
+// generates — the datastar fetches and the stylesheet — is built from this, so
+// the mount point and the links can never drift apart.
+const BasePath = "/admin"
+
+// datastarVersion pins the client bundle. It is assembled from parts rather than
+// written as one literal because "…datastar@v1.0.2/…" matches an email address:
+// Cloudflare's obfuscator rewrote exactly this URL to "[email protected]" in a
+// previous edit, the script 400'd, and the dashboard silently lost every
+// interaction with no error on screen.
+const datastarVersion = "v1.0.2"
+
+// datastarCDN is the client bundle URL. Keep it in sync with the datastar-go SDK
+// version in go.mod (v1.2.x speaks the v1.0.x wire format).
+var datastarCDN = "https://cdn.jsdelivr.net/gh/starfederation/datastar" + "@" + datastarVersion + "/bundles/datastar.js"
+
 // intStr and uintStr are tiny helpers so the templates can print numeric fields
 // without embedding strconv calls in the markup.
 func intStr(n int) string   { return strconv.Itoa(n) }
@@ -159,7 +175,7 @@ func (s *Server) buildPage(ctx context.Context) (PageVM, error) {
 			Width:       barWidth(todays[i], maxToday),
 			// selectedKey has no underscore so it round-trips to the backend; the
 			// @get patches #detail with the chosen key.
-			OnClick:    fmt.Sprintf("$selectedKey = %d; @get('/keys/%d')", k.ID, k.ID),
+			OnClick:    fmt.Sprintf("$selectedKey = %d; @get('%s/keys/%d')", k.ID, BasePath, k.ID),
 			ActiveExpr: fmt.Sprintf("$selectedKey === %d", k.ID),
 		})
 	}
@@ -271,7 +287,7 @@ func (s *Server) buildDetail(ctx context.Context, k apikey.APIKey, now time.Time
 		Elevated:    k.Priority > apikey.NormalPriority,
 		BudgetLabel: budgetLabel(k.TokenBudget),
 		Period:      string(k.BudgetPeriod),
-		RefreshExpr: fmt.Sprintf("@get('/keys/%d')", k.ID),
+		RefreshExpr: fmt.Sprintf("@get('%s/keys/%d')", BasePath, k.ID),
 		Buckets: []BucketVM{
 			{Label: "today", TokensLabel: humanize.Comma(rep.Today), Width: barWidth(rep.Today, peak), Emphasis: true},
 			{Label: "this week", TokensLabel: humanize.Comma(rep.ThisWeek), Width: barWidth(rep.ThisWeek, peak)},

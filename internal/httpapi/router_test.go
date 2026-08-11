@@ -22,10 +22,19 @@ func dashboardStub() http.Handler {
 func testRouter(t *testing.T, dashboard http.Handler, auth func(http.Handler) http.Handler) http.Handler {
 	t.Helper()
 	return Router{
+		Landing:       landingStub(),
 		Dashboard:     dashboard,
 		DashboardAuth: auth,
 		Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}.Handler()
+}
+
+// landingStub stands in for the public documentation page.
+func landingStub() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("how to call the API"))
+	})
 }
 
 func get(t *testing.T, h http.Handler, path string, creds ...string) *httptest.ResponseRecorder {
@@ -46,7 +55,7 @@ func TestDashboardRequiresCredentials(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h := testRouter(t, dashboardStub(), BasicAuth("admin", "hunter2", logger))
 
-	for _, path := range []string{"/", "/keys/1", "/queue", "/assets/dashboard.css"} {
+	for _, path := range []string{"/admin", "/admin/keys/1", "/admin/queue", "/admin/assets/dashboard.css"} {
 		t.Run(path, func(t *testing.T) {
 			w := get(t, h, path)
 			require.Equal(t, http.StatusUnauthorized, w.Code)
@@ -64,8 +73,20 @@ func TestDashboardRequiresCredentials(t *testing.T) {
 func TestDashboardIsNotServedWithoutAuth(t *testing.T) {
 	h := testRouter(t, dashboardStub(), nil)
 
-	w := get(t, h, "/")
+	w := get(t, h, "/admin")
 	require.Equal(t, http.StatusNotFound, w.Code)
+	require.NotContains(t, w.Body.String(), "every key")
+}
+
+// TestLandingIsPublic: the site root is documentation for API users, served
+// without credentials, and it must never expose operator data.
+func TestLandingIsPublic(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	h := testRouter(t, dashboardStub(), BasicAuth("admin", "hunter2", logger))
+
+	w := get(t, h, "/")
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), "how to call the API")
 	require.NotContains(t, w.Body.String(), "every key")
 }
 

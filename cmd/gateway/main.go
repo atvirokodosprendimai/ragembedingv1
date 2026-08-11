@@ -69,6 +69,10 @@ func run(logger *slog.Logger) error {
 	// it can show live pool pressure.
 	dashboard := web.NewServer(keyRepo, usageRepo, pool, cfg.EmbedModel, time.Now, logger)
 
+	// Public API documentation. It is built from the same config the gateway
+	// enforces, so the limits it advertises cannot drift from the real ones.
+	landing := web.NewLanding(cfg.EmbedModel, cfg.Defaults.BatchMax, cfg.Defaults.RatePerMin, logger)
+
 	// The dashboard is operator-only and is not served without a credential:
 	// it lists every key, its limits and its spend.
 	var dashboardAuth func(http.Handler) http.Handler
@@ -81,6 +85,7 @@ func run(logger *slog.Logger) error {
 	router := httpapi.Router{
 		Keys:          keyRepo,
 		Embeddings:    embeddings,
+		Landing:       landing.Handler(),
 		Dashboard:     dashboard.Handler(),
 		DashboardAuth: dashboardAuth,
 		Logger:        logger,
