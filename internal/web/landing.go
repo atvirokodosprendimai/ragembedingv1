@@ -19,6 +19,7 @@ type LandingServer struct {
 	model      string
 	batchMax   int
 	ratePerMin int
+	plan       Plan
 	contact    Contact
 	logger     *slog.Logger
 }
@@ -42,8 +43,10 @@ type Contact struct {
 
 // NewLanding builds the landing page from the gateway's own configuration, so
 // the limits it documents are the ones the gateway actually applies to a new key
-// rather than numbers copied into prose and left to rot.
-func NewLanding(model string, batchMax, ratePerMin int, contact Contact, logger *slog.Logger) *LandingServer {
+// rather than numbers copied into prose and left to rot. The published price
+// arrives the same way and for the same reason: what the page sells and what a
+// new key is issued with are one set of numbers, read from one place.
+func NewLanding(model string, batchMax, ratePerMin int, plan Plan, contact Contact, logger *slog.Logger) *LandingServer {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -51,6 +54,7 @@ func NewLanding(model string, batchMax, ratePerMin int, contact Contact, logger 
 		model:      model,
 		batchMax:   batchMax,
 		ratePerMin: ratePerMin,
+		plan:       plan,
 		contact:    contact,
 		logger:     logger,
 	}
@@ -88,7 +92,10 @@ type LandingVM struct {
 	AdminPath  string
 	// Contact is who to ask for a key. There is no self-service signup, so
 	// without it the page tells a visitor to ask someone it cannot name.
-	Contact  Contact
+	Contact Contact
+	// Plan is what the key costs. It sits beside the limits above because the
+	// two answer one question — what do I get, and for how much.
+	Plan     Plan
 	Statuses []StatusVM
 }
 
@@ -109,6 +116,7 @@ func (s *LandingServer) build(r *http.Request) LandingVM {
 		RatePerMin: strconv.Itoa(s.ratePerMin),
 		AdminPath:  BasePath,
 		Contact:    s.contact,
+		Plan:       s.plan,
 		Statuses: []StatusVM{
 			{Code: "200", Meaning: "Vektoriai grąžinti", Action: "—", Tone: "ok"},
 			{Code: "400", Meaning: "Netaisyklingas JSON arba per daug tekstų viename pakete", Action: "Pataisykite užklausą", Tone: "bad"},

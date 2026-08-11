@@ -87,9 +87,11 @@ func run(logger *slog.Logger) error {
 	dashboard := web.NewServer(keyRepo, usageRepo, pool, hub, cfg.EmbedModel, time.Now, logger)
 
 	// Public API documentation. It is built from the same config the gateway
-	// enforces, so the limits it advertises cannot drift from the real ones.
+	// enforces, so the limits it advertises — and the price attached to them —
+	// cannot drift from the real ones.
 	contact := web.NewContact(cfg.ContactEmail, cfg.ContactPhone, cfg.CompanyURL)
-	landing := web.NewLanding(cfg.EmbedModel, cfg.Defaults.BatchMax, cfg.Defaults.RatePerMin, contact, logger)
+	plan := web.NewPlan(cfg.Plan.PriceEUR, cfg.Plan.VATPercent)
+	landing := web.NewLanding(cfg.EmbedModel, cfg.Defaults.BatchMax, cfg.Defaults.RatePerMin, plan, contact, logger)
 
 	// The dashboard is operator-only and is not served without a credential:
 	// it lists every key, its limits and its spend.

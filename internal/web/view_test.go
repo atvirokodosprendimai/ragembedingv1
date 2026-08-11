@@ -112,7 +112,7 @@ func TestDashboardServesItsStylesheetWhenMounted(t *testing.T) {
 // TestLandingServesItsStylesheet covers the same ground for the public page,
 // which is mounted at the site root rather than under a prefix.
 func TestLandingServesItsStylesheet(t *testing.T) {
-	h := NewLanding("bge-m3", 25, 400, NewContact("info@ituoga.lt", "+37063594444", "https://letas.lt"), slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
+	h := NewLanding("bge-m3", 25, 100, NewPlan(50, 21), NewContact("info@ituoga.lt", "+37063594444", "https://letas.lt"), slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
 
 	r := httptest.NewRequest(http.MethodGet, "/assets/landing.css", nil)
 	w := httptest.NewRecorder()

@@ -15,6 +15,7 @@ var envKeys = []string{
 	"DEFAULT_BATCH_MAX", "DEFAULT_RATE_PER_MIN", "DEFAULT_TOKEN_BUDGET", "DEFAULT_BUDGET_PERIOD",
 	"DEFAULT_PRIORITY", "UPSTREAM_MAX_CONCURRENT", "QUEUE_PROMOTE_AFTER",
 	"DASHBOARD_USER", "DASHBOARD_PASSWORD",
+	"PLAN_PRICE_EUR", "PLAN_VAT_PERCENT",
 }
 
 func clearEnv(t *testing.T) {
@@ -37,12 +38,16 @@ func TestLoadDefaults(t *testing.T) {
 	require.Equal(t, "http://localhost:11435", cfg.CaddyUpstreamURL)
 	require.Equal(t, "bge-m3", cfg.EmbedModel)
 	require.Equal(t, 25, cfg.Defaults.BatchMax)
-	require.Equal(t, 400, cfg.Defaults.RatePerMin)
+	// 100/min is the rate the published plan sells; a new key must not quietly
+	// receive more headroom than the page promises.
+	require.Equal(t, 100, cfg.Defaults.RatePerMin)
 	require.Equal(t, int64(-1), cfg.Defaults.TokenBudget)
 	require.Equal(t, "lifetime", cfg.Defaults.BudgetPeriod)
 	require.Equal(t, 0, cfg.Defaults.Priority)
 	require.Equal(t, 10, cfg.Queue.MaxConcurrent)
 	require.Equal(t, 5*time.Second, cfg.Queue.PromoteAfter)
+	require.Equal(t, 50, cfg.Plan.PriceEUR)
+	require.Equal(t, 21, cfg.Plan.VATPercent)
 	// The dashboard exposes every key's spend, so it stays off until an operator
 	// sets a password — it must never default to reachable.
 	require.False(t, cfg.Dashboard.Enabled())
@@ -63,6 +68,8 @@ func TestLoadEnvOverridesDefaults(t *testing.T) {
 	t.Setenv("DEFAULT_PRIORITY", "3")
 	t.Setenv("UPSTREAM_MAX_CONCURRENT", "24")
 	t.Setenv("QUEUE_PROMOTE_AFTER", "1500ms")
+	t.Setenv("PLAN_PRICE_EUR", "80")
+	t.Setenv("PLAN_VAT_PERCENT", "0")
 
 	cfg, err := Load()
 	require.NoError(t, err)
@@ -76,6 +83,10 @@ func TestLoadEnvOverridesDefaults(t *testing.T) {
 	require.Equal(t, 3, cfg.Defaults.Priority)
 	require.Equal(t, 24, cfg.Queue.MaxConcurrent)
 	require.Equal(t, 1500*time.Millisecond, cfg.Queue.PromoteAfter)
+	require.Equal(t, 80, cfg.Plan.PriceEUR)
+	// 0% is a legitimate setting (a non-VAT-registered operator), so it must
+	// survive validation rather than be mistaken for "unset".
+	require.Equal(t, 0, cfg.Plan.VATPercent)
 }
 
 // TestLoadRejectsInvalid asserts the fail-fast guards: each case is a value that
@@ -93,6 +104,10 @@ func TestLoadRejectsInvalid(t *testing.T) {
 		"negative priority":  {"DEFAULT_PRIORITY": "-1"},
 		"zero concurrency":   {"UPSTREAM_MAX_CONCURRENT": "0"},
 		"zero promote-after": {"QUEUE_PROMOTE_AFTER": "0s"},
+		"free price":         {"PLAN_PRICE_EUR": "0"},
+		"negative price":     {"PLAN_PRICE_EUR": "-50"},
+		"negative vat":       {"PLAN_VAT_PERCENT": "-1"},
+		"vat over 100":       {"PLAN_VAT_PERCENT": "101"},
 		"password without a user": {
 			"DASHBOARD_PASSWORD": "hunter2", "DASHBOARD_USER": " ",
 		},
