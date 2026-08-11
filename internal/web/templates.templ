@@ -10,8 +10,12 @@ templ Page(vm PageVM) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>ragembed · token usage</title>
-			<script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/[email protected]/bundles/datastar.js"></script>
-			<link rel="stylesheet" href="/assets/dashboard.css"/>
+			// The version is spelled out rather than pasted: an "@v1.0.2" suffix looks
+			// like an email address to Cloudflare's obfuscator, which silently rewrote
+			// this URL to "[email protected]" once — the script 400'd and the whole
+			// dashboard lost its interactivity with no visible error.
+			<script type="module" src={ datastarCDN }></script>
+			<link rel="stylesheet" href={ BasePath + "/assets/dashboard.css" }/>
 		</head>
 		<body>
 			<div class="wrap" data-signals={ vm.SignalsInit }>
@@ -32,7 +36,7 @@ templ Page(vm PageVM) {
 						class="panel pressure"
 						aria-label="Upstream pool pressure"
 						data-indicator:_queueSync
-						data-on-interval__duration.2s="$_queueLive && @get('/queue')"
+						data-on-interval__duration.5s={ "$_queueLive && @get('" + BasePath + "/queue')" }
 					>
 						<div class="panel-head pressure-head">
 							<span><span class="tick">┌─</span> pool pressure</span>
@@ -66,7 +70,7 @@ templ Page(vm PageVM) {
 						</nav>
 						<section
 							class="panel detailcol"
-							data-on-interval__duration.30s="$selectedKey && @get('/keys/' + $selectedKey)"
+							data-on-interval__duration.30s={ "$selectedKey && @get('" + BasePath + "/keys/' + $selectedKey)" }
 						>
 							@Detail(*vm.Detail)
 						</section>

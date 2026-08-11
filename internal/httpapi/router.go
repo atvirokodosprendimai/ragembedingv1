@@ -9,6 +9,7 @@ import (
 
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/domain/apikey"
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/proxy"
+	"github.com/atvirokodosprendimai/ragembedingv1/internal/web"
 )
 
 // Router assembles the gateway's HTTP surface from its collaborators. Fields are
@@ -19,7 +20,9 @@ type Router struct {
 	Keys apikey.Repository
 	// Embeddings is the /v1/embeddings enforcement handler.
 	Embeddings *proxy.Handler
-	// Dashboard, if set, is mounted at the site root for the usage UI. It is
+	// Landing, if set, serves the public API documentation at the site root.
+	Landing http.Handler
+	// Dashboard, if set, is mounted under web.BasePath for the usage UI. It is
 	// only mounted together with DashboardAuth.
 	Dashboard http.Handler
 	// DashboardAuth guards the dashboard. Without it the dashboard is not served
@@ -56,11 +59,18 @@ func (rt Router) Handler() http.Handler {
 		r.Post("/api/embed", rt.Embeddings.Embeddings)
 	})
 
-	// Operator dashboard, mounted at root so it serves "/", "/keys/{id}",
-	// "/queue" and the static assets — all of it behind Basic auth. The pairing
-	// is enforced here rather than trusted to the composition root: a wiring
-	// mistake that dropped the middleware would otherwise publish every key's
-	// usage to the internet.
+	// Public landing page: what the API is and how to call it. It is the site
+	// root so a client who pastes the gateway's address into a browser lands on
+	// documentation rather than a 404 or, worse, the operator's dashboard.
+	if rt.Landing != nil {
+		r.Method(http.MethodGet, "/", rt.Landing)
+		r.Method(http.MethodGet, "/assets/landing.css", rt.Landing)
+	}
+
+	// Operator dashboard, mounted under /admin and entirely behind Basic auth.
+	// The pairing is enforced here rather than trusted to the composition root:
+	// a wiring mistake that dropped the middleware would otherwise publish every
+	// key's usage to the internet.
 	switch {
 	case rt.Dashboard == nil:
 		// Nothing to mount; the embeddings API is unaffected.
@@ -69,7 +79,7 @@ func (rt Router) Handler() http.Handler {
 	default:
 		r.Group(func(r chi.Router) {
 			r.Use(rt.DashboardAuth)
-			r.Mount("/", rt.Dashboard)
+			r.Mount(web.BasePath, rt.Dashboard)
 		})
 	}
 

@@ -17,11 +17,11 @@ import (
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/queue"
 )
 
-// assets embeds the dashboard stylesheet so the gateway serves it itself, with
-// no external files to deploy. It is a real .css file (not templ) so CSS braces
-// never collide with templ's expression syntax.
+// assets embeds the dashboard and landing stylesheets so the gateway serves them
+// itself, with no external files to deploy. They are real .css files (not templ)
+// so CSS braces never collide with templ's expression syntax.
 //
-//go:embed static/dashboard.css
+//go:embed static/dashboard.css static/landing.css
 var assets embed.FS
 
 // poolReporter is the dashboard's read-only view of the admission queue. It is
@@ -64,9 +64,13 @@ func (s *Server) Handler() http.Handler {
 	r.Get("/keys/{id}", s.handleKeyDetail)
 	r.Get("/queue", s.handleQueue)
 
-	// Serve /assets/dashboard.css from the embedded FS.
+	// Serve the stylesheet from the embedded FS. The prefix includes BasePath
+	// because chi's Mount routes on its own RoutePath and leaves r.URL.Path
+	// untouched — StripPrefix sees the full "/admin/assets/…" and would 404 on a
+	// bare "/assets/" prefix (which is exactly what happened when the dashboard
+	// moved off the site root, serving the whole UI unstyled).
 	sub, _ := fs.Sub(assets, "static")
-	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.FS(sub))))
+	r.Handle("/assets/*", http.StripPrefix(BasePath+"/assets/", http.FileServer(http.FS(sub))))
 	return r
 }
 

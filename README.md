@@ -74,13 +74,27 @@ ragctl create --name nightly-batch            # priority 0, the default
 ragctl priority --id 3 --priority 9           # promote a key already deployed
 ```
 
+## Pages
+
+| Path | Who | What |
+|------|-----|------|
+| `/` | public | Landing page: how to call the API, with copy-paste curl for both endpoints, the real configured limits and the status-code contract |
+| `/admin` | operator | Usage dashboard, behind Basic auth |
+| `/healthz` | public | Liveness probe |
+
+The landing page is built from the gateway's own config, so the limits it
+advertises cannot drift from the ones actually enforced. It touches neither the
+key store nor the usage store, so it cannot leak who holds a key or what they
+spend.
+
 ## Dashboard access
 
 The dashboard is operator-only — it lists every key, its limits and its spend —
-so it sits behind HTTP Basic auth and **fails closed**: with no
-`DASHBOARD_PASSWORD` set it is not served at all (`404`), and the embeddings API
-carries on regardless. The whole surface is guarded (`/`, `/keys/{id}`, `/queue`
-and the assets); only `/healthz` stays public, so load balancers still work.
+so it lives under `/admin`, sits behind HTTP Basic auth, and **fails closed**:
+with no `DASHBOARD_PASSWORD` set it is not served at all (`404`), and the
+embeddings API carries on regardless. The whole surface is guarded (`/admin`,
+`/admin/keys/{id}`, `/admin/queue` and its assets); only `/healthz` and the
+landing page stay public.
 
 ```bash
 DASHBOARD_USER=admin DASHBOARD_PASSWORD='…' go run ./cmd/gateway
@@ -122,7 +136,7 @@ internal/budget    prepaid-allowance checker
 internal/queue     priority admission queue in front of the pool
 internal/proxy     /v1/embeddings enforcement pipeline + forwarder
 internal/httpapi   chi router + Bearer-auth middleware
-internal/web       datastar/templ usage dashboard
+internal/web       datastar/templ dashboard (/admin) + public landing page (/)
 internal/platform/database  GORM + no-cgo SQLite + repositories
 migrations/        goose SQL migrations (embedded)
 caddy/Caddyfile    load balancer for the 10 Ollama backends
@@ -173,8 +187,10 @@ curl http://localhost:8080/api/embed \
   -H "Content-Type: application/json" \
   -d '{"model":"bge-m3","input":["hello","world"]}'
 
-# 5. Open the usage dashboard:
-open http://localhost:8080/
+# 5. Open the usage dashboard (asks for DASHBOARD_USER / DASHBOARD_PASSWORD):
+open http://localhost:8080/admin
+
+# …and http://localhost:8080/ is the public page telling clients how to call it.
 ```
 
 `ragctl list` shows every key with its limits, queue rank and month/lifetime token

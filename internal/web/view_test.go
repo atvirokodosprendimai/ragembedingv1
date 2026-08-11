@@ -1,9 +1,14 @@
 package web
 
 import (
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 
 	"github.com/atvirokodosprendimai/ragembedingv1/internal/queue"
@@ -79,4 +84,40 @@ func TestBuildQueueStates(t *testing.T) {
 		require.False(t, vm.Classes[0].Aged, "the fresh priority class is not being promoted")
 		require.True(t, vm.Classes[1].Aged)
 	})
+}
+
+// TestDashboardServesItsStylesheetWhenMounted is the regression test for a bug
+// the browser caught and the router tests did not: chi's Mount routes on its own
+// RoutePath and leaves r.URL.Path alone, so once the dashboard moved to /admin a
+// bare StripPrefix("/assets/") stopped matching and the stylesheet 404'd — the
+// whole UI rendered unstyled while every status-code assertion still passed.
+func TestDashboardServesItsStylesheetWhenMounted(t *testing.T) {
+	srv := NewServer(nil, nil, nil, "bge-m3", nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	// Mount exactly as the gateway does.
+	root := chi.NewRouter()
+	root.Mount(BasePath, srv.Handler())
+
+	r := httptest.NewRequest(http.MethodGet, BasePath+"/assets/dashboard.css", nil)
+	w := httptest.NewRecorder()
+	root.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	// A browser refuses a stylesheet served as text/plain, so the type matters
+	// as much as the status.
+	require.Contains(t, w.Header().Get("Content-Type"), "text/css")
+	require.Contains(t, w.Body.String(), "--amber")
+}
+
+// TestLandingServesItsStylesheet covers the same ground for the public page,
+// which is mounted at the site root rather than under a prefix.
+func TestLandingServesItsStylesheet(t *testing.T) {
+	h := NewLanding("bge-m3", 25, 400, slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
+
+	r := httptest.NewRequest(http.MethodGet, "/assets/landing.css", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Header().Get("Content-Type"), "text/css")
 }

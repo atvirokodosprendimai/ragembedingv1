@@ -1,0 +1,106 @@
+package web
+
+import (
+	"io/fs"
+	"log/slog"
+	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
+)
+
+// LandingServer serves the public, unauthenticated page that tells a client how
+// to call the API. It is deliberately separate from the operator dashboard: it
+// touches neither the key store nor the usage store, so there is no path by
+// which it could leak who holds a key or what they spend.
+type LandingServer struct {
+	model      string
+	batchMax   int
+	ratePerMin int
+	logger     *slog.Logger
+}
+
+// NewLanding builds the landing page from the gateway's own configuration, so
+// the limits it documents are the ones the gateway actually applies to a new key
+// rather than numbers copied into prose and left to rot.
+func NewLanding(model string, batchMax, ratePerMin int, logger *slog.Logger) *LandingServer {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &LandingServer{model: model, batchMax: batchMax, ratePerMin: ratePerMin, logger: logger}
+}
+
+// Handler returns the landing page's routes: the page itself and its stylesheet.
+func (s *LandingServer) Handler() http.Handler {
+	r := chi.NewRouter()
+	r.Get("/", s.handleIndex)
+
+	sub, _ := fs.Sub(assets, "static")
+	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.FS(sub))))
+	return r
+}
+
+func (s *LandingServer) handleIndex(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := Landing(s.build(r)).Render(r.Context(), w); err != nil {
+		s.logger.Error("landing: render", "err", err)
+	}
+}
+
+// LandingVM is the landing page's view model. Like the dashboard's, every string
+// the template prints is computed here so the markup stays a pure projection.
+type LandingVM struct {
+	Model      string
+	BaseURL    string // the address the visitor actually reached, for copy-paste curl
+	BatchMax   string
+	RatePerMin string
+	AdminPath  string
+	Statuses   []StatusVM
+}
+
+// StatusVM is one row of the status-code contract.
+type StatusVM struct {
+	Code    string
+	Meaning string
+	Action  string
+	Tone    string // "ok" | "warn" | "bad" — drives the row's accent
+}
+
+// build assembles the page for this request.
+func (s *LandingServer) build(r *http.Request) LandingVM {
+	return LandingVM{
+		Model:      s.model,
+		BaseURL:    baseURL(r),
+		BatchMax:   strconv.Itoa(s.batchMax),
+		RatePerMin: strconv.Itoa(s.ratePerMin),
+		AdminPath:  BasePath,
+		Statuses: []StatusVM{
+			{Code: "200", Meaning: "Embeddings returned", Action: "—", Tone: "ok"},
+			{Code: "400", Meaning: "Bad JSON, or more inputs than your batch limit", Action: "Fix the request", Tone: "bad"},
+			{Code: "401", Meaning: "Missing, invalid or revoked key", Action: "Check your key", Tone: "bad"},
+			{Code: "402", Meaning: "Token budget spent", Action: "Wait for the monthly reset, or ask for a top-up", Tone: "warn"},
+			{Code: "429", Meaning: "Too many requests this minute", Action: "Retry after the Retry-After header", Tone: "warn"},
+			{Code: "502", Meaning: "Embedding backend unavailable", Action: "Retry shortly", Tone: "bad"},
+			{Code: "503", Meaning: "Cancelled while queued", Action: "Retry", Tone: "warn"},
+		},
+	}
+}
+
+// baseURL reconstructs the address the visitor used, so the curl examples are
+// copy-pasteable rather than pointing at a placeholder host.
+//
+// X-Forwarded-Proto is consulted because the gateway usually runs behind a TLS
+// terminator and would otherwise advertise http:// for an https:// site. The
+// header is client-controlled, but it is used for display only — nothing is
+// authorised or routed on it — so spoofing it only garbles the visitor's own
+// copy of the example.
+func baseURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto == "https" {
+		scheme = "https"
+	}
+	return scheme + "://" + r.Host
+}
