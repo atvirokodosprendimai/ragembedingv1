@@ -26,6 +26,7 @@ func main() {
 		Commands: []*cli.Command{
 			createCommand(),
 			listCommand(),
+			priorityCommand(),
 			revokeCommand(),
 		},
 	}
@@ -75,6 +76,7 @@ func createCommand() *cli.Command {
 			&cli.IntFlag{Name: "rate", Usage: "max requests per minute"},
 			&cli.Int64Flag{Name: "budget", Usage: "token budget: -1 for unlimited, or a prepaid count (e.g. 100000000)"},
 			&cli.StringFlag{Name: "period", Usage: "budget period: monthly|lifetime"},
+			&cli.IntFlag{Name: "priority", Usage: "admission-queue rank: 0 = free/normal, up to 9 for front-of-house traffic"},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			st, err := openStores()
@@ -99,10 +101,18 @@ func createCommand() *cli.Command {
 			if c.IsSet("period") {
 				period = apikey.BudgetPeriod(c.String("period"))
 			}
+			priority := st.cfg.Defaults.Priority
+			if c.IsSet("priority") {
+				priority = c.Int("priority")
+			}
 
 			// Validate before touching the database so a bad flag fails cleanly.
 			if !period.Valid() {
 				return fmt.Errorf("invalid --period %q (want monthly or lifetime)", period)
+			}
+			if !apikey.ValidPriority(priority) {
+				return fmt.Errorf("--priority must be between %d and %d, got %d",
+					apikey.NormalPriority, apikey.MaxPriority, priority)
 			}
 			if batch < 1 {
 				return fmt.Errorf("--batch must be >= 1, got %d", batch)
@@ -125,6 +135,7 @@ func createCommand() *cli.Command {
 				RatePerMin:   rate,
 				TokenBudget:  tokenBudget,
 				BudgetPeriod: period,
+				Priority:     priority,
 			}
 			if err := st.keys.Create(ctx, k); err != nil {
 				return err
@@ -160,7 +171,7 @@ func listCommand() *cli.Command {
 			windows := usage.ReportWindows(now)
 
 			tw := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-			fmt.Fprintln(tw, "ID\tNAME\tSTATUS\tBATCH\tRATE/min\tBUDGET\tPERIOD\tTOKENS(month)\tTOKENS(life)")
+			fmt.Fprintln(tw, "ID\tNAME\tSTATUS\tPRIO\tBATCH\tRATE/min\tBUDGET\tPERIOD\tTOKENS(month)\tTOKENS(life)")
 			for _, k := range keys {
 				month, err := st.usage.SumTokens(ctx, k.ID, windows.ThisMonth.From, now)
 				if err != nil {
@@ -170,12 +181,52 @@ func listCommand() *cli.Command {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(tw, "%d\t%s\t%s\t%d\t%d\t%s\t%s\t%s\t%s\n",
-					k.ID, dash(k.Name), status(k), k.BatchMax, k.RatePerMin,
+				fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%d\t%d\t%s\t%s\t%s\t%s\n",
+					k.ID, dash(k.Name), status(k), priorityString(k.Priority),
+					k.BatchMax, k.RatePerMin,
 					budgetString(k.TokenBudget), k.BudgetPeriod,
 					humanize.Comma(month), humanize.Comma(life))
 			}
 			return tw.Flush()
+		},
+	}
+}
+
+// priorityCommand re-ranks an existing key in the admission queue. It exists so
+// the main site's already-deployed key can be promoted in place, without minting
+// a replacement and rolling it out.
+func priorityCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "priority",
+		Usage: "set a key's admission-queue rank (0 = free/normal, 9 = front-of-house)",
+		Flags: []cli.Flag{
+			&cli.UintFlag{Name: "id", Usage: "id of the key to re-rank", Required: true},
+			&cli.IntFlag{Name: "priority", Usage: "new rank, 0-9", Required: true},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			st, err := openStores()
+			if err != nil {
+				return err
+			}
+			priority := c.Int("priority")
+			if !apikey.ValidPriority(priority) {
+				return fmt.Errorf("--priority must be between %d and %d, got %d",
+					apikey.NormalPriority, apikey.MaxPriority, priority)
+			}
+
+			// Look the key up first so a typo'd id reports "not found" instead of
+			// silently updating nothing.
+			id := c.Uint("id")
+			k, err := st.keys.ByID(ctx, id)
+			if err != nil {
+				return err
+			}
+			if err := st.keys.SetPriority(ctx, id, priority); err != nil {
+				return err
+			}
+			fmt.Printf("key %d (%s): priority %s → %s\n",
+				id, dash(k.Name), priorityString(k.Priority), priorityString(priority))
+			return nil
 		},
 	}
 }
@@ -215,6 +266,17 @@ func printCreated(k *apikey.APIKey, plaintext string) {
 	fmt.Printf("  batch:   %d inputs/request\n", k.BatchMax)
 	fmt.Printf("  rate:    %d requests/min\n", k.RatePerMin)
 	fmt.Printf("  budget:  %s (%s)\n", budgetString(k.TokenBudget), k.BudgetPeriod)
+	fmt.Printf("  prio:    %s\n", priorityString(k.Priority))
+}
+
+// priorityString renders a queue rank compactly enough for a table column, with
+// an arrow on anything above the free tier so a promoted key is obvious at a
+// glance rather than hiding in a column of similar digits.
+func priorityString(p int) string {
+	if p == apikey.NormalPriority {
+		return "0"
+	}
+	return fmt.Sprintf("%d ↑", p)
 }
 
 // budgetString renders -1 as "unlimited" and any prepaid budget with thousands
