@@ -4,7 +4,9 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -17,14 +19,31 @@ type LandingServer struct {
 	model      string
 	batchMax   int
 	ratePerMin int
-	contact    string
+	contact    Contact
 	logger     *slog.Logger
+}
+
+// Contact is how a reader reaches the operator. It travels as one value because
+// the three parts are always published together — an email with no phone and no
+// company behind it reads like an anonymous side project.
+type Contact struct {
+	Email string
+	// Phone in international form, digits only apart from the leading plus:
+	// this is what goes in a tel: link.
+	Phone string
+	// PhoneLabel is the same number grouped for reading.
+	PhoneLabel string
+	// CompanyURL is the operator's own site.
+	CompanyURL string
+	// CompanyName is the site's domain, used as the visible link text and as the
+	// organisation name in structured data.
+	CompanyName string
 }
 
 // NewLanding builds the landing page from the gateway's own configuration, so
 // the limits it documents are the ones the gateway actually applies to a new key
 // rather than numbers copied into prose and left to rot.
-func NewLanding(model string, batchMax, ratePerMin int, contact string, logger *slog.Logger) *LandingServer {
+func NewLanding(model string, batchMax, ratePerMin int, contact Contact, logger *slog.Logger) *LandingServer {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -67,10 +86,10 @@ type LandingVM struct {
 	BatchMax   string
 	RatePerMin string
 	AdminPath  string
-	// ContactEmail is who to ask for a key. There is no self-service signup, so
+	// Contact is who to ask for a key. There is no self-service signup, so
 	// without it the page tells a visitor to ask someone it cannot name.
-	ContactEmail string
-	Statuses     []StatusVM
+	Contact  Contact
+	Statuses []StatusVM
 }
 
 // StatusVM is one row of the status-code contract.
@@ -84,12 +103,12 @@ type StatusVM struct {
 // build assembles the page for this request.
 func (s *LandingServer) build(r *http.Request) LandingVM {
 	return LandingVM{
-		Model:        s.model,
-		BaseURL:      baseURL(r),
-		BatchMax:     strconv.Itoa(s.batchMax),
-		RatePerMin:   strconv.Itoa(s.ratePerMin),
-		AdminPath:    BasePath,
-		ContactEmail: s.contact,
+		Model:      s.model,
+		BaseURL:    baseURL(r),
+		BatchMax:   strconv.Itoa(s.batchMax),
+		RatePerMin: strconv.Itoa(s.ratePerMin),
+		AdminPath:  BasePath,
+		Contact:    s.contact,
 		Statuses: []StatusVM{
 			{Code: "200", Meaning: "Vektoriai grąžinti", Action: "—", Tone: "ok"},
 			{Code: "400", Meaning: "Netaisyklingas JSON arba per daug tekstų viename pakete", Action: "Pataisykite užklausą", Tone: "bad"},
@@ -119,4 +138,38 @@ func baseURL(r *http.Request) string {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host
+}
+
+// NewContact assembles the published contact details. The phone is stored twice
+// on purpose: dialling needs unpunctuated digits, reading needs grouping, and
+// deriving one from the other in a template is how they drift apart.
+func NewContact(email, phone, companyURL string) Contact {
+	return Contact{
+		Email:       email,
+		Phone:       phone,
+		PhoneLabel:  groupPhone(phone),
+		CompanyURL:  companyURL,
+		CompanyName: hostOf(companyURL),
+	}
+}
+
+// groupPhone renders a Lithuanian mobile number the way it is read aloud:
+// +370 6xx xxxxx. Anything that is not a Lithuanian mobile is left alone rather
+// than mangled into a shape it does not have.
+func groupPhone(phone string) string {
+	const ltMobile = "+3706"
+	if len(phone) != 12 || !strings.HasPrefix(phone, ltMobile) {
+		return phone
+	}
+	return phone[:4] + " " + phone[4:7] + " " + phone[7:]
+}
+
+// hostOf is the display name for a company URL: the bare host, since that is
+// how people say and recognise it.
+func hostOf(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Host == "" {
+		return rawURL
+	}
+	return strings.TrimPrefix(u.Host, "www.")
 }

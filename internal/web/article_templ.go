@@ -169,46 +169,54 @@ func Article(vm ArticleVM) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</dl></section><section aria-labelledby=\"pradeti\" class=\"cta\"><h2 id=\"pradeti\">Nuo ko pradėti</h2><p>Paprasčiausias pirmas žingsnis — paimti šimtą tikrų savo dokumentų ir patikrinti, ar paieška randa tai, ko žmonės iš tikrųjų klausia. Tam užtenka rakto ir kelių valandų.</p><p><a class=\"mailto\" href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</dl></section><section aria-labelledby=\"pradeti\" class=\"cta\"><h2 id=\"pradeti\">Nuo ko pradėti</h2><p>Paprasčiausias pirmas žingsnis — paimti šimtą tikrų savo dokumentų ir patikrinti, ar paieška randa tai, ko žmonės iš tikrųjų klausia. Tam užtenka rakto ir kelių valandų.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var10 templ.SafeURL
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("mailto:" + vm.ContactEmail + "?subject=ragembed%20API%20raktas"))
+		templ_7745c5c3_Err = contactLinks(vm.Contact).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 255, Col: 112}
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</section></article></main><footer class=\"foot\"><span>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var10 string
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Model)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 260, Col: 16}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\"><span class=\"tick\" aria-hidden=\"true\">✉</span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, " embeddingai · <a class=\"admin-link\" href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var11 string
-		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(vm.ContactEmail)
+		var templ_7745c5c3_Var11 templ.SafeURL
+		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(vm.Contact.CompanyURL))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 257, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 261, Col: 71}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</a></p></section></article></main><footer class=\"foot\"><span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var12 string
-		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Model)
+		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Contact.CompanyName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 264, Col: 21}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/article.templ`, Line: 261, Col: 98}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, " embeddingai · tekstai lieka jūsų infrastruktūroje</span> <a class=\"admin-link\" href=\"/\">← techninė dokumentacija</a></footer></div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</a></span> <a class=\"admin-link\" href=\"/\">← techninė dokumentacija</a></footer></div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

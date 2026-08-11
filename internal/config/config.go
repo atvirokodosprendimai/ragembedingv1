@@ -92,6 +92,13 @@ type Config struct {
 	// ContactEmail is published on the landing page as the address to ask for a
 	// key at. It is operator-facing contact detail, not a secret.
 	ContactEmail string
+	// ContactPhone is published alongside the email, in international form so it
+	// dials from anywhere.
+	ContactPhone string
+	// CompanyURL is the operator's own site. The public pages link to it and the
+	// article names it as the publisher, which is what ties this service to a
+	// real organisation rather than leaving it an anonymous host.
+	CompanyURL string
 	// Defaults are the per-token limit fallbacks.
 	Defaults Defaults
 	// Queue is the upstream admission queue's configuration.
@@ -121,6 +128,8 @@ func Load() (Config, error) {
 		CaddyUpstreamURL: envStr("CADDY_UPSTREAM_URL", "http://localhost:11435"),
 		EmbedModel:       envStr("EMBED_MODEL", "bge-m3"),
 		ContactEmail:     envStr("CONTACT_EMAIL", "info@ituoga.lt"),
+		ContactPhone:     envStr("CONTACT_PHONE", "+37063594444"),
+		CompanyURL:       envStr("COMPANY_URL", "https://letas.lt"),
 		Defaults: Defaults{
 			BatchMax:     envInt("DEFAULT_BATCH_MAX", 25),
 			RatePerMin:   envInt("DEFAULT_RATE_PER_MIN", 400),

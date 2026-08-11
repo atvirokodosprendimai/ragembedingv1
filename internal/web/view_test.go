@@ -112,7 +112,7 @@ func TestDashboardServesItsStylesheetWhenMounted(t *testing.T) {
 // TestLandingServesItsStylesheet covers the same ground for the public page,
 // which is mounted at the site root rather than under a prefix.
 func TestLandingServesItsStylesheet(t *testing.T) {
-	h := NewLanding("bge-m3", 25, 400, "info@ituoga.lt", slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
+	h := NewLanding("bge-m3", 25, 400, NewContact("info@ituoga.lt", "+37063594444", "https://letas.lt"), slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
 
 	r := httptest.NewRequest(http.MethodGet, "/assets/landing.css", nil)
 	w := httptest.NewRecorder()
@@ -120,4 +120,23 @@ func TestLandingServesItsStylesheet(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Header().Get("Content-Type"), "text/css")
+}
+
+// TestNewContactFormatsTheNumberForBothUses: a tel: link needs unpunctuated
+// digits, a reader needs grouping, and the company link needs a bare host.
+func TestNewContactFormatsTheNumberForBothUses(t *testing.T) {
+	c := NewContact("info@ituoga.lt", "+37063594444", "https://letas.lt")
+
+	require.Equal(t, "+37063594444", c.Phone, "the dialable form must stay unpunctuated")
+	require.Equal(t, "+370 635 94444", c.PhoneLabel)
+	require.Equal(t, "letas.lt", c.CompanyName)
+	require.Equal(t, "https://letas.lt", c.CompanyURL)
+}
+
+// TestGroupPhoneLeavesForeignNumbersAlone: guessing at the grouping of a number
+// shape we do not know produces something wrong, which is worse than plain.
+func TestGroupPhoneLeavesForeignNumbersAlone(t *testing.T) {
+	for _, n := range []string{"+442071838750", "+37052345678", "12345", ""} {
+		require.Equal(t, n, groupPhone(n))
+	}
 }

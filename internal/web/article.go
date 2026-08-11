@@ -33,7 +33,7 @@ type ArticleVM struct {
 	Model        string
 	BaseURL      string
 	CanonicalURL string
-	ContactEmail string
+	Contact      Contact
 	BatchMax     string
 	// FAQ is rendered twice: as visible questions and answers, and as JSON-LD.
 	// One source for both, so the structured data can never claim something the
@@ -64,7 +64,7 @@ func (s *LandingServer) buildArticle(r *http.Request) ArticleVM {
 		Model:        s.model,
 		BaseURL:      base,
 		CanonicalURL: base + articlePath,
-		ContactEmail: s.contact,
+		Contact:      s.contact,
 		BatchMax:     intStr(s.batchMax),
 		FAQ:          articleFAQ(s.model),
 	}
@@ -149,8 +149,25 @@ func articleJSONLD(vm ArticleVM) string {
 		Accepted answer `json:"acceptedAnswer"`
 	}
 
+	// The publisher node is what ties the article to a real organisation rather
+	// than leaving it an anonymous page on an anonymous host.
+	publisher := map[string]any{
+		"@type": "Organization",
+		"name":  vm.Contact.CompanyName,
+		"url":   vm.Contact.CompanyURL,
+		"email": vm.Contact.Email,
+		"contactPoint": map[string]any{
+			"@type":             "ContactPoint",
+			"contactType":       "sales",
+			"telephone":         vm.Contact.Phone,
+			"email":             vm.Contact.Email,
+			"availableLanguage": []string{"lt", "en"},
+		},
+	}
+
 	article := map[string]any{
 		"@type":            "TechArticle",
+		"publisher":        publisher,
 		"headline":         articleHeadline,
 		"inLanguage":       "lt",
 		"mainEntityOfPage": vm.CanonicalURL,
@@ -179,7 +196,7 @@ func articleJSONLD(vm ArticleVM) string {
 
 	graph := map[string]any{
 		"@context": "https://schema.org",
-		"@graph":   []any{article, faq},
+		"@graph":   []any{article, faq, publisher},
 	}
 
 	out, err := json.Marshal(graph)

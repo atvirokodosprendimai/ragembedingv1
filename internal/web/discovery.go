@@ -77,7 +77,8 @@ func (s *LandingServer) handleLLMs(w http.ResponseWriter, r *http.Request) {
 	b.WriteString("## Nuorodos\n\n")
 	b.WriteString(fmt.Sprintf("- [Techninė dokumentacija](%s/): adresai, curl pavyzdžiai, atsakymų kodai, limitai.\n", base))
 	b.WriteString(fmt.Sprintf("- [Kada reikia embeddingų API](%s%s): kada šis sprendimas tinka, kada ne, BDAR ir kaina.\n", base, articlePath))
-	b.WriteString(fmt.Sprintf("- Kontaktas dėl rakto: %s\n", s.contact))
+	b.WriteString(fmt.Sprintf("- Kontaktas dėl rakto: %s, %s\n", s.contact.Email, s.contact.PhoneLabel))
+	b.WriteString(fmt.Sprintf("- Operatorius: %s (%s)\n", s.contact.CompanyName, s.contact.CompanyURL))
 
 	_, _ = w.Write([]byte(b.String()))
 }
