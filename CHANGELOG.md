@@ -14,3 +14,4 @@
 - 2026-08-11 `84bb59b` docs: document the published plan and the new rate default
 - 2026-08-11 `2c1aefe` fix(web): agree the plan's Lithuanian with its own numbers
 - 2026-08-11 `1c3fe4e` Merge branch 'task/pricing'
+- 2026-08-11 `9094a4c` chore: changelog
