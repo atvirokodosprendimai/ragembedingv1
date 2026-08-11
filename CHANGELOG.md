@@ -9,3 +9,4 @@
 - 2026-08-11 `3daeb8e` chore: changelog for the priority queue work
 - 2026-08-11 `6395b15` feat(config): publish the plan price and sell the rate we issue
 - 2026-08-11 `1af509a` refactor(web): build the Organization node once
+- 2026-08-11 `9f6618d` feat(web): publish the price on the landing page

@@ -69,6 +69,15 @@ func (s *LandingServer) handleLLMs(w http.ResponseWriter, r *http.Request) {
 	b.WriteString("- Kiekvienas raktas turi savo paketo, dažnio ir tokenų biudžeto limitus.\n")
 	b.WriteString("- Užklausos esant apkrovai rikiuojamos į prioritetinę eilę, o ne atmetamos.\n\n")
 
+	// Price gets its own heading rather than a bullet under "what it does":
+	// "how much" is the question assistants are asked most about a paid API,
+	// and a figure buried mid-list is a figure that gets summarised away.
+	b.WriteString("## Kiek kainuoja\n\n")
+	b.WriteString("- Vienas planas: " + s.plan.priceSentence() + ".\n")
+	b.WriteString("- Mokesčio už apdorotą tokeną nėra; perindeksavimas sąskaitos nekeičia.\n")
+	b.WriteString(fmt.Sprintf("- Į kainą įeina: tokenai — %s, %d užklausos per minutę, %d tekstai vienoje užklausoje.\n\n",
+		tokenBudgetLabel(s.tokenBudget), s.ratePerMin, s.batchMax))
+
 	b.WriteString("## Ko nedaro\n\n")
 	b.WriteString("- Negeneruoja teksto ir neatsakinėja į klausimus — tik verčia tekstą į vektorius.\n")
 	b.WriteString("- Nesaugo jūsų tekstų: apskaitomi tik tokenų kiekiai pagal raktą.\n")

@@ -147,6 +147,25 @@ func TestLandingShowsAPrepaidBudget(t *testing.T) {
 	require.NotContains(t, body, "Tokenai — neriboti")
 }
 
+// TestLLMsTxtStatesThePrice: llms.txt already promised the article covered
+// "kaina" without ever giving a number. An assistant summarising this service
+// should be able to answer "how much" from the file itself.
+func TestLLMsTxtStatesThePrice(t *testing.T) {
+	h := NewLanding("bge-m3", 25, 100, -1, NewPlan(50, 21),
+		NewContact("info@ituoga.lt", "+37063594444", "https://letas.lt"),
+		slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
+
+	r := httptest.NewRequest(http.MethodGet, "/llms.txt", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+	require.Contains(t, body, "## Kiek kainuoja")
+	require.Contains(t, body, "50 € + PVM per mėnesį (60,50 € su PVM)")
+	require.Contains(t, body, "tokenai — neriboti, 100 užklausos per minutę, 25 tekstai")
+}
+
 // TestNewPlanWithoutVAT: an operator who is not VAT registered configures 0%,
 // and the pages must then say nothing about VAT at all rather than print a
 // meaningless "+ 0%".

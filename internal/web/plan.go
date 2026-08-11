@@ -43,6 +43,18 @@ func NewPlan(priceEUR, vatPercent int) Plan {
 	}
 }
 
+// priceSentence is the offer as a clause that reads inside running prose, for
+// the two surfaces that cannot use the landing page's layout to carry meaning:
+// the article's FAQ answer and llms.txt. Both are lifted and quoted verbatim —
+// by a search result, by an assistant — so the clause has to stand alone and
+// still say which figure includes VAT.
+func (p Plan) priceSentence() string {
+	if !p.HasVAT() {
+		return p.PriceExVAT + " € per mėnesį"
+	}
+	return p.PriceExVAT + " € + PVM per mėnesį (" + p.PriceIncVAT + " € su PVM)"
+}
+
 // HasVAT reports whether VAT is charged at all. An operator who is not VAT
 // registered configures 0%, and for them "+ PVM" and a VAT-inclusive line are
 // not a nuance — they are a wrong statement about the price, so the pages drop
