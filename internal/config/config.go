@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -16,6 +17,10 @@ const (
 	periodMonthly  = "monthly"
 	periodLifetime = "lifetime"
 )
+
+// maxPriority mirrors apikey.MaxPriority as a bare int, for the same
+// no-dependency-on-the-domain reason as the period identifiers above.
+const maxPriority = 9
 
 // Defaults are the per-token limits applied to a new API key when the operator
 // does not override them at creation time. They are the fallbacks the whole
@@ -34,6 +39,26 @@ type Defaults struct {
 	// BudgetPeriod is either "monthly" (allowance resets each calendar month) or
 	// "lifetime" (cumulative, never resets).
 	BudgetPeriod string
+	// Priority is the admission-queue rank a new key is issued with. 0 is the
+	// free tier; the operator raises it (up to 9) for front-of-house traffic.
+	Priority int
+}
+
+// Queue configures the admission queue that fronts the Ollama pool. Its job is
+// to keep the operator's own site off the back of a batch client's flood, so the
+// two knobs are "how much work the pool can take at once" and "how long anyone
+// may be made to wait for it".
+type Queue struct {
+	// MaxConcurrent is how many requests may be in flight upstream at once. It
+	// should match what the pool behind Caddy can actually chew through — one
+	// slot per Ollama backend is the sane starting point. Set it too high and
+	// the queue stops meaning anything (everything piles up inside Ollama
+	// instead, where the gateway cannot rank it); too low and the pool idles.
+	MaxConcurrent int
+	// PromoteAfter is how long a request may sit in the queue before it is
+	// admitted ahead of higher-priority work. It is the anti-starvation valve
+	// that keeps "priority" from becoming "free users never get served".
+	PromoteAfter time.Duration
 }
 
 // Config is the fully resolved gateway configuration.
@@ -49,6 +74,8 @@ type Config struct {
 	EmbedModel string
 	// Defaults are the per-token limit fallbacks.
 	Defaults Defaults
+	// Queue is the upstream admission queue's configuration.
+	Queue Queue
 }
 
 // Load resolves configuration from the process environment, first sourcing a
@@ -76,6 +103,12 @@ func Load() (Config, error) {
 			RatePerMin:   envInt("DEFAULT_RATE_PER_MIN", 400),
 			TokenBudget:  envInt64("DEFAULT_TOKEN_BUDGET", -1),
 			BudgetPeriod: envStr("DEFAULT_BUDGET_PERIOD", periodLifetime),
+			Priority:     envInt("DEFAULT_PRIORITY", 0),
+		},
+		Queue: Queue{
+			// One slot per Ollama backend in the reference topology.
+			MaxConcurrent: envInt("UPSTREAM_MAX_CONCURRENT", 10),
+			PromoteAfter:  envDuration("QUEUE_PROMOTE_AFTER", 5*time.Second),
 		},
 	}
 
@@ -104,6 +137,18 @@ func (c Config) validate() error {
 	if c.Defaults.BudgetPeriod != periodMonthly && c.Defaults.BudgetPeriod != periodLifetime {
 		return fmt.Errorf("config: DEFAULT_BUDGET_PERIOD must be %q or %q, got %q", periodMonthly, periodLifetime, c.Defaults.BudgetPeriod)
 	}
+	if c.Defaults.Priority < 0 || c.Defaults.Priority > maxPriority {
+		return fmt.Errorf("config: DEFAULT_PRIORITY must be between 0 and %d, got %d", maxPriority, c.Defaults.Priority)
+	}
+	// A queue of zero would admit nothing at all, and a non-positive promotion
+	// window would promote every waiter immediately, collapsing priority into
+	// plain FIFO. Both are silent behaviour changes, so they fail at startup.
+	if c.Queue.MaxConcurrent < 1 {
+		return fmt.Errorf("config: UPSTREAM_MAX_CONCURRENT must be >= 1, got %d", c.Queue.MaxConcurrent)
+	}
+	if c.Queue.PromoteAfter <= 0 {
+		return fmt.Errorf("config: QUEUE_PROMOTE_AFTER must be > 0, got %s", c.Queue.PromoteAfter)
+	}
 	u, err := url.Parse(c.CaddyUpstreamURL)
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return fmt.Errorf("config: CADDY_UPSTREAM_URL must be an absolute URL, got %q", c.CaddyUpstreamURL)
@@ -127,6 +172,18 @@ func envInt(key string, def int) int {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
+		}
+	}
+	return def
+}
+
+// envDuration is envInt for a Go duration string ("5s", "1500ms"). Like the
+// other env helpers, an unparseable override falls back to the default rather
+// than crashing the process; validate() still guards the resulting value.
+func envDuration(key string, def time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
 		}
 	}
 	return def
