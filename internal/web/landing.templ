@@ -30,6 +30,10 @@ templ Landing(vm LandingVM) {
 			<meta property="og:url" content={ vm.BaseURL + "/" }/>
 			<meta property="og:locale" content="lt_LT"/>
 			<link rel="stylesheet" href="/assets/landing.css"/>
+			// The service and its price, machine-readable. An assistant asked what a
+			// Lithuanian embeddings API costs should not have to infer the number
+			// from prose.
+			@templ.Raw(`<script type="application/ld+json">` + vm.JSONLD + `</script>`)
 		</head>
 		<body>
 			<div class="page">

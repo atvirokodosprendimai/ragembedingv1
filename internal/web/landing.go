@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -106,6 +107,11 @@ type LandingVM struct {
 	// two answer one question — what do I get, and for how much.
 	Plan     Plan
 	Statuses []StatusVM
+	// JSONLD is the schema.org graph for this page, already serialised. It is
+	// what an AI search engine reads when it is asked what this costs, and it is
+	// built from this same view model so it cannot advertise a price the page
+	// does not show.
+	JSONLD string
 }
 
 // StatusVM is one row of the status-code contract.
@@ -118,7 +124,7 @@ type StatusVM struct {
 
 // build assembles the page for this request.
 func (s *LandingServer) build(r *http.Request) LandingVM {
-	return LandingVM{
+	vm := LandingVM{
 		Model:       s.model,
 		BaseURL:     baseURL(r),
 		BatchMax:    strconv.Itoa(s.batchMax),
@@ -137,6 +143,73 @@ func (s *LandingServer) build(r *http.Request) LandingVM {
 			{Code: "503", Meaning: "Užklausa nutraukta belaukiant eilėje", Action: "Pakartokite", Tone: "warn"},
 		},
 	}
+	// Built last, from the finished view model, so the structured data is a
+	// projection of the page rather than a second opinion about it.
+	vm.JSONLD = landingJSONLD(vm)
+	return vm
+}
+
+// landingJSONLD describes the service and its price as schema.org.
+//
+// The page's job is increasingly to be quoted rather than visited: somebody
+// asks an assistant what a Lithuanian embeddings API costs, and the answer is
+// only right if the price is machine-readable. An Offer carries it explicitly
+// so the figure is never inferred from prose.
+//
+// encoding/json escapes <, > and & by default. That is usually a nuisance;
+// inside a <script> block it is exactly what is wanted, since it makes it
+// impossible for any value to close the element early.
+func landingJSONLD(vm LandingVM) string {
+	provider := organizationJSONLD(vm.Contact)
+
+	// UnitPriceSpecification is what makes this a subscription rather than a
+	// one-off sale: the reference quantity of one MON (UN/CEFACT for a month)
+	// says the price recurs monthly, and valueAddedTaxIncluded says out loud
+	// that 50 € is the pre-VAT quote — the distinction a Lithuanian buyer would
+	// otherwise have to guess at.
+	priceSpec := map[string]any{
+		"@type":                 "UnitPriceSpecification",
+		"price":                 vm.Plan.PriceEUR,
+		"priceCurrency":         "EUR",
+		"valueAddedTaxIncluded": false,
+		"referenceQuantity": map[string]any{
+			"@type":    "QuantitativeValue",
+			"value":    1,
+			"unitCode": "MON",
+		},
+	}
+
+	service := map[string]any{
+		"@type":       "Service",
+		"name":        "ragembed",
+		"serviceType": "Embeddingų (vektorizavimo) API",
+		"url":         vm.BaseURL + "/",
+		"provider":    provider,
+		"areaServed":  map[string]any{"@type": "Country", "name": "Lietuva"},
+		"description": "Su OpenAI suderinamas embeddingų API, paremtas " + vm.Model +
+			" modeliu ir veikiantis operatoriaus infrastruktūroje.",
+		"offers": map[string]any{
+			"@type":              "Offer",
+			"price":              vm.Plan.PriceEUR,
+			"priceCurrency":      "EUR",
+			"url":                vm.BaseURL + "/#kaina",
+			"availability":       "https://schema.org/InStock",
+			"priceSpecification": priceSpec,
+		},
+	}
+
+	graph := map[string]any{
+		"@context": "https://schema.org",
+		"@graph":   []any{service, provider},
+	}
+
+	out, err := json.Marshal(graph)
+	if err != nil {
+		// Every value here is a plain string, int or map thereof, so this cannot
+		// fail; dropping the block is still better than emitting broken markup.
+		return ""
+	}
+	return string(out)
 }
 
 // tokenBudgetLabel puts a key's token allowance into the words the price
