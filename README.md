@@ -26,7 +26,7 @@ client ──Bearer sk-rag-…──▶ gateway ──▶ Caddy (:11435) ──�
   hash is stored. Keys are issued from the CLI, never self-service.
 - **Batch limit** — rejects a request whose `input` array exceeds the key's
   `batch_max` (default 25) with `400`.
-- **Rate limit** — per-key requests/minute (default 400). Over the limit returns
+- **Rate limit** — per-key requests/minute (default 100). Over the limit returns
   `429` with a `Retry-After` header telling the client exactly how long to wait.
 - **Token budget** — each key has a budget of `bge-m3` input tokens:
   - `-1` = unlimited (on-demand), or a prepaid allowance (e.g. `100000000`);
@@ -135,7 +135,7 @@ the key you are watching streams, which is the point of an actor per key.
 
 | Path | Who | What |
 |------|-----|------|
-| `/` | public | Landing page (Lithuanian): how to call the API, copy-paste curl for both endpoints, the real configured limits and the status-code contract |
+| `/` | public | Landing page (Lithuanian): how to call the API, copy-paste curl for both endpoints, the real configured limits, the price and the status-code contract |
 | `/kada-reikia-embeddingu-api` | public | Long-form article: when this service is worth it, when it is not, GDPR, cost, Lithuanian support. See `docs/seo.md` |
 | `/robots.txt`, `/sitemap.xml`, `/llms.txt` | public | Crawler and assistant discovery |
 | `/admin` | operator | Usage dashboard, behind Basic auth |
@@ -145,6 +145,24 @@ The landing page is built from the gateway's own config, so the limits it
 advertises cannot drift from the ones actually enforced. It touches neither the
 key store nor the usage store, so it cannot leak who holds a key or what they
 spend.
+
+### The published plan
+
+One plan, priced from `PLAN_PRICE_EUR` / `PLAN_VAT_PERCENT` and described by the
+same `DEFAULT_*` limits a new key is issued with — the page cannot sell terms the
+gateway does not hand out:
+
+| | |
+|---|---|
+| Price | **50 € + PVM / month** (60,50 € incl. 21% VAT) |
+| Tokens | unlimited — no per-token charge |
+| Rate | 100 requests/min per key |
+| Batch | 25 inputs per request |
+
+The same figures go out as a schema.org `Offer` on `/`, in the article's cost
+section, and under `## Kiek kainuoja` in `llms.txt`, so an assistant asked what
+this costs reads the price rather than inferring it. Set `PLAN_VAT_PERCENT=0`
+and every surface drops the VAT wording instead of printing a meaningless `0%`.
 
 ## Dashboard access
 
@@ -217,10 +235,12 @@ Copy `.env.example` to `.env`. Real environment variables override `.env`.
 | `CONTACT_PHONE` | `+37063594444` | Phone published alongside it (becomes a `tel:` link) |
 | `COMPANY_URL` | `https://letas.lt` | Operator's site; linked publicly and named as the article's publisher |
 | `DEFAULT_BATCH_MAX` | `25` | Default inputs/request per key |
-| `DEFAULT_RATE_PER_MIN` | `400` | Default requests/min per key |
+| `DEFAULT_RATE_PER_MIN` | `100` | Default requests/min per key |
 | `DEFAULT_TOKEN_BUDGET` | `-1` | Default token budget (`-1` = unlimited) |
 | `DEFAULT_BUDGET_PERIOD` | `lifetime` | Default period (`monthly`/`lifetime`) |
 | `DEFAULT_PRIORITY` | `0` | Default queue rank for a new key (`0`–`9`) |
+| `PLAN_PRICE_EUR` | `50` | Published monthly price, excluding VAT |
+| `PLAN_VAT_PERCENT` | `21` | VAT rate used to derive the published inclusive figure (`0` hides VAT entirely) |
 | `DASHBOARD_USER` | `admin` | Dashboard Basic-auth username |
 | `DASHBOARD_PASSWORD` | *(empty)* | Dashboard Basic-auth password; **empty disables the dashboard** |
 | `UPSTREAM_MAX_CONCURRENT` | `10` | Concurrent upstream slots (one per Ollama backend) |
