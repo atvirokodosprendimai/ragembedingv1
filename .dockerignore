@@ -1,0 +1,21 @@
+# Keep the build context to what actually compiles. Anything listed here that
+# changes would otherwise invalidate the COPY layer and force a full rebuild.
+.git
+.gitignore
+.serena
+.claude
+
+# Secrets and local state never belong in an image: .env carries the dashboard
+# password, and the database carries every key hash and usage row.
+.env
+*.db
+*.db-shm
+*.db-wal
+
+# Docs and the deployment files themselves are not inputs to `go build`.
+README.md
+CHANGELOG.md
+docs
+Dockerfile
+compose.yaml
+.dockerignore

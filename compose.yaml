@@ -1,0 +1,50 @@
+# Build-from-source deployment of the gateway and the Caddy load balancer it
+# forwards to.
+#
+# The ten Ollama backends are deliberately NOT services here: they are the hosts
+# named in caddy/Caddyfile, which you edit for your own pool. Point them at real
+# addresses, or attach this stack to the network they already run on — the
+# Caddyfile's own header describes both shapes.
+services:
+  gateway:
+    build: .
+    restart: always
+    depends_on:
+      caddy:
+        # Caddy answers /healthz regardless of whether the Ollama pool is up, so
+        # this only orders startup; it is not a claim that embeddings will work.
+        condition: service_healthy
+    env_file:
+      # Optional, and it is where DASHBOARD_PASSWORD belongs: with no password
+      # the dashboard is not served at all (the embeddings API is unaffected).
+      # Values set below still win — real env beats .env, as config.Load() does.
+      - path: .env
+        required: false
+    environment:
+      # Inside the compose network the balancer is a service name. The default
+      # (http://localhost:11435) would resolve to the gateway's own container.
+      CADDY_UPSTREAM_URL: http://caddy:11435
+      # Matches the image's volume, so keys and usage outlive a rebuild.
+      DB_PATH: /data/ragembed.db
+    ports:
+      - "8080:8080"
+    volumes:
+      - gateway-data:/data
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    volumes:
+      # Read-only: this file is the balancer's whole configuration and belongs
+      # to the repository, not to the container.
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    healthcheck:
+      # The Caddyfile serves this itself; `admin off` means there is no admin
+      # endpoint to probe instead.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:11435/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  gateway-data:

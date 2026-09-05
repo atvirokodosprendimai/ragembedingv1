@@ -293,6 +293,27 @@ The command prints a before/after diff of exactly what moved, validates against
 the same rules `create` uses, and refuses an unknown id rather than silently
 changing nothing.
 
+### With Docker
+
+`compose.yaml` builds the gateway from source and runs it next to the Caddy
+balancer, both with `restart: always`. Point `caddy/Caddyfile` at your real
+Ollama backends first — the stack starts Caddy, it does not invent a pool.
+
+```bash
+cp .env.example .env      # set DASHBOARD_PASSWORD, or the dashboard is not served
+docker compose up -d --build
+
+# Keys stay CLI-only, and ragctl ships in the same image as the gateway:
+docker compose exec gateway ragctl create --name my-app
+docker compose exec gateway ragctl list
+```
+
+Compose sets `CADDY_UPSTREAM_URL=http://caddy:11435` and
+`DB_PATH=/data/ragembed.db`, which override `.env` the same way any real
+environment variable does; every other row in the table above is read from
+`.env` as usual. The database sits on the `gateway-data` volume, so keys and
+usage survive `up --build`.
+
 ## Development
 
 ```bash
